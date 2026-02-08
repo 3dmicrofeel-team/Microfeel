@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic RAG - LUA脚本生成系统</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🎮 Agentic RAG - LUA地图脚本生成系统</h1>
+            <p class="subtitle">自然语言输入 → 智能Agent处理 → 完整LUA脚本</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 左侧：配置面板 -->
+            <div class="config-panel">
+                <div class="panel-section">
+                    <h2>模型配置</h2>
+                    
+                    <div class="form-group">
+                        <label for="api-key">
+                            API Key
+                            <span class="tooltip" data-tooltip="OpenAI API密钥（可选，不填则使用模拟数据）">ℹ️</span>
+                        </label>
+                        <input 
+                            type="password" 
+                            id="api-key" 
+                            class="form-control" 
+                            placeholder="sk-..."
+                            autocomplete="off"
+                        >
+                        <div class="api-key-actions">
+                            <button id="save-api-key-btn" class="btn-small" title="保存API Key">
+                                💾 保存
+                            </button>
+                            <button id="clear-api-key-btn" class="btn-small" title="清除API Key">
+                                🗑️ 清除
+                            </button>
+                            <button id="toggle-api-key-btn" class="btn-small" title="显示/隐藏">
+                                👁️ 显示
+                            </button>
+                        </div>
+                        <div id="api-key-status" class="api-key-status"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="model-select">选择模型</label>
+                        <select id="model-select" class="form-control">
+                            <option value="gpt-4.1">GPT-4.1</option>
+                            <option value="gpt-5.1">GPT-5.1</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="temperature">
+                            Temperature
+                            <span class="tooltip" data-tooltip="控制输出的随机性，值越高越随机">ℹ️</span>
+                            <span class="value-display" id="temp-value">0.7</span>
+                        </label>
+                        <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" class="slider">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max-tokens">
+                            Max Tokens
+                            <span class="tooltip" data-tooltip="生成的最大token数量">ℹ️</span>
+                            <span class="value-display" id="tokens-value">4000</span>
+                        </label>
+                        <input type="range" id="max-tokens" min="1000" max="8000" step="500" value="4000" class="slider">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="top-p">
+                            Top P
+                            <span class="tooltip" data-tooltip="核采样参数，控制多样性">ℹ️</span>
+                            <span class="value-display" id="topp-value">0.9</span>
+                        </label>
+                        <input type="range" id="top-p" min="0" max="1" step="0.05" value="0.9" class="slider">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="frequency-penalty">
+                            Frequency Penalty
+                            <span class="tooltip" data-tooltip="降低重复内容的频率">ℹ️</span>
+                            <span class="value-display" id="freq-value">0.0</span>
+                        </label>
+                        <input type="range" id="frequency-penalty" min="-2" max="2" step="0.1" value="0.0" class="slider">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="presence-penalty">
+                            Presence Penalty
+                            <span class="tooltip" data-tooltip="鼓励谈论新话题">ℹ️</span>
+                            <span class="value-display" id="pres-value">0.0</span>
+                        </label>
+                        <input type="range" id="presence-penalty" min="-2" max="2" step="0.1" value="0.0" class="slider">
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h2>Agent配置</h2>
+                    
+                    <div class="form-group">
+                        <label for="agent-mode">
+                            Agent模式
+                            <span class="tooltip" data-tooltip="选择Agent的工作模式">ℹ️</span>
+                        </label>
+                        <select id="agent-mode" class="form-control">
+                            <option value="standard">标准模式（单次生成）</option>
+                            <option value="iterative">迭代模式（多次优化）</option>
+                            <option value="multi-agent">多Agent协作</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max-iterations">
+                            最大迭代次数
+                            <span class="tooltip" data-tooltip="迭代模式下的最大优化次数">ℹ️</span>
+                            <span class="value-display" id="iter-value">3</span>
+                        </label>
+                        <input type="range" id="max-iterations" min="1" max="10" step="1" value="3" class="slider">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中间：输入和输出区域 -->
+            <div class="content-area">
+                <div class="input-section">
+                    <h2>自然语言输入</h2>
+                    <textarea 
+                        id="user-input" 
+                        class="input-textarea" 
+                        placeholder="请描述你想要创建的地图场景，例如：&#10;&#10;创建一个新手村地图，包含：&#10;- 中央有一个中世纪风格的村庄，有酒馆、商店和铁匠铺&#10;- 村庄北边是一片迷雾森林，有1-5级的怪物&#10;- 村庄东南角有一个废弃矿洞入口，需要完成特定任务才能进入&#10;- 村庄西边有一个训练场&#10;- 西北角有一个湖泊，湖边有渔夫小屋&#10;- 村庄和各个区域之间有道路连接&#10;&#10;请详细描述你的需求..."
+                        rows="12"
+                    ></textarea>
+                    
+                    <div class="input-actions">
+                        <button id="generate-btn" class="btn btn-primary">
+                            <span class="btn-icon">🚀</span>
+                            生成LUA脚本
+                        </button>
+                        <button id="clear-btn" class="btn btn-secondary">
+                            <span class="btn-icon">🗑️</span>
+                            清空
+                        </button>
+                        <button id="example-btn" class="btn btn-secondary">
+                            <span class="btn-icon">📝</span>
+                            加载示例
+                        </button>
+                    </div>
+                </div>
+
+                <div class="output-section">
+                    <div class="output-header">
+                        <h2>生成的LUA脚本</h2>
+                        <div class="output-actions">
+                            <button id="copy-btn" class="btn btn-icon" title="复制代码">
+                                📋
+                            </button>
+                            <button id="download-btn" class="btn btn-icon" title="下载文件">
+                                💾
+                            </button>
+                            <button id="format-btn" class="btn btn-icon" title="格式化代码">
+                                ✨
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="output-container" class="output-container">
+                        <div class="empty-state">
+                            <div class="empty-icon">📜</div>
+                            <p>生成的LUA脚本将显示在这里</p>
+                            <p class="empty-hint">输入你的地图需求，然后点击"生成LUA脚本"按钮</p>
+                        </div>
+                    </div>
+
+                    <div id="status-bar" class="status-bar hidden">
+                        <div class="status-content">
+                            <span class="status-icon">⏳</span>
+                            <span class="status-text">正在生成中...</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：规则参考面板 -->
+        <div class="rules-panel">
+            <h2>规则参考</h2>
+            <div class="rules-content">
+                <div class="rule-section">
+                    <h3>生成步骤</h3>
+                    <ol class="steps-list">
+                        <li>创建地图</li>
+                        <li>塑造地形</li>
+                        <li>划分Block区域</li>
+                        <li>填充Block内容</li>
+                        <li>建立连接</li>
+                        <li>自动化处理</li>
+                        <li>设置氛围</li>
+                        <li>验证并构建</li>
+                    </ol>
+                </div>
+
+                <div class="rule-section">
+                    <h3>常用API</h3>
+                    <div class="api-list">
+                        <div class="api-item">
+                            <code>Env.CreateMap(width, height, scale)</code>
+                            <span>创建地图</span>
+                        </div>
+                        <div class="api-item">
+                            <code>Env.AddBlock(map, name, pos, size)</code>
+                            <span>添加区域</span>
+                        </div>
+                        <div class="api-item">
+                            <code>Env.AddBuilding(block, pos, size, theme, rot)</code>
+                            <span>添加建筑</span>
+                        </div>
+                        <div class="api-item">
+                            <code>Env.AddRoad(map, from, to, width, type)</code>
+                            <span>添加道路</span>
+                        </div>
+                        <div class="api-item">
+                            <code>Env.AddNPCSpawn(block, id, pos, rot)</code>
+                            <span>添加NPC</span>
+                        </div>
+                        <div class="api-item">
+                            <code>Env.AddEnemySpawn(block, type, pos, radius)</code>
+                            <span>添加敌人</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rule-section">
+                    <h3>提示</h3>
+                    <ul class="tips-list">
+                        <li>详细描述地图的各个区域和功能</li>
+                        <li>说明区域之间的连接关系</li>
+                        <li>指定建筑类型、NPC、敌人等</li>
+                        <li>描述地形特征和氛围设置</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

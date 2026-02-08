@@ -1,0 +1,306 @@
+第一部分：API 列表
+
+模块 P1：Map 创建与地形
+
+模块 P2：Block 管理
+
+模块 P3：Block 内容填充
+
+模块 P4：Block 连接系统
+
+模块 P5：自动化工具
+
+模块 P6：程序化生成
+
+模块 P7：氛围设置
+
+模块 P8：存储与构建
+
+模块 R1-R6：运行时 API（Level构建后）
+
+第二部分：LLM 适用的原子函数总结
+
+以下是适合 LLM 调用的原子级函数，按照从基础到高级的顺序组织，便于 LLM 逐步构建复杂关卡。
+
+一、核心原子函数（必须掌握）
+
+这些是构建任何关卡的基础函数：
+
+二、地形塑造原子函数
+
+三、内容填充原子函数
+
+四、自动化函数（LLM 强烈推荐）
+
+这些函数能大幅减少 LLM 的工作量，强烈推荐优先使用：
+
+五、程序化生成函数（高级）
+
+六、LLM 推荐工作流
+
+1. 创建地图
+
+└─ Env.CreateMap(100, 100, 200)
+
+2. 塑造地形（可选）
+
+├─ Env.RaiseTerrain(...)     -- 山丘
+
+├─ Env.LowerTerrain(...)     -- 山谷
+
+└─ Env.AddWaterBody(...)     -- 水体
+
+3. 划分区域
+
+├─ Env.AddBlock(map, "村庄", ...)
+
+├─ Env.AddBlock(map, "森林", ...)
+
+└─ Env.SetBlockType(block, "Village")
+
+4. 填充内容
+
+├─ Env.AddBuilding(...)
+
+├─ Env.AddNPCSpawn(...)
+
+├─ Env.AddEnemySpawn(...)
+
+└─ Env.AddSpawnPoint(...)
+
+5. 建立连接
+
+└─ Env.AddRoad(map, blockA, blockB, ...)
+
+或 Env.AutoGenerateRoads(map)  -- 推荐
+
+6. 自动美化（强烈推荐）
+
+├─ Env.AutoPaintTerrain(map)
+
+├─ Env.AutoAddVegetation(map, 0.5)
+
+└─ Env.AutoDecorate(map)
+
+7. 设置氛围
+
+├─ Env.SetTimeOfDay(map, 10)
+
+└─ Env.SetWeather(map, "Clear")
+
+8. 验证并构建
+
+├─ Env.ValidateMap(map)
+
+└─ Env.BuildAsync(map, callback)
+
+七、LLM 最小可行关卡示例
+
+-- 最简单的可玩关卡（约10行代码）
+
+local map = Env.CreateMap(50, 50, 200)
+
+local village = Env.AddBlock(map, "起点", {X=10, Y=10}, {X=15, Y=15})
+
+Env.SetBlockType(village, "Village")
+
+Env.AddSpawnPoint(village, "PlayerStart", {X=500, Y=500, Z=0})
+
+Env.AddNPCSpawn(village, "NPC_Guide", {X=800, Y=500, Z=0}, {Pitch=0, Yaw=180, Roll=0})
+
+-- 自动美化
+
+Env.AutoPaintTerrain(map)
+
+Env.AutoAddVegetation(map, 0.3)
+
+-- 构建
+
+Env.Build(map)
+
+八、函数分类速查
+
+=== 表格内容 ===
+
+
+表格 1:
+Lua | C++ 签名 | 说明 | 参数与返回值 | 示例
+Env.CreateMap(W, H,) | FMapHandle CreateMapData(int32 W, int32 H,) | 创建一个空白地图数据容器，指定网格尺寸 | 参数: W-网格宽度, H-网格高度, CellSize-每格尺寸(cm) 返回: MapHandle | local map = Env.CreateMap(100, 100)
+Env.SetMapName(Map, Name) | void SetMapName(FMapHandle M, FString Name) | 为地图设置一个可读名称，用于保存和UI显示 | 参数: Map-地图句柄, Name-名称字符串 | Env.SetMapName(map, "新手村")
+Env.SetMapTheme(Map, Theme) | void SetMapTheme(FMapHandle M, FString Theme) | 设置地图主题风格，影响自动生成时的资产选择 | 参数: Map, Theme-"Medieval"/"Asian"/"Ruins"/"Nature" | Env.SetMapTheme(map, "Medieval")
+Env.SetTerrainHeight(Map, X, Y, Height) | void SetTerrainHeightAt(FMapHandle M, int32 X, int32 Y, float H) | 设置地形网格中单个点的高度值 | 参数: Map, X-网格X, Y-网格Y, Height-高度(cm) | Env.SetTerrainHeight(map, 50, 50, 200)
+Env.SetTerrainHeightBatch(Map, Points) | void SetTerrainHeightBatch(FMapHandle M, TArray<FHeightPoint> Pts) | 批量设置多个高度点，比逐个设置更高效 | 参数: Map, Points-高度点数组[{X,Y,H},...] | Env.SetTerrainHeightBatch(map, {{X=10,Y=10,H=100}, {X=20,Y=20,H=200}})
+Env.RaiseTerrain(Map, Center, Radius, Height, Falloff) | void RaiseTerrainArea(FMapHandle M, FIntPoint C, int32 R, float H, float F) | 以指定中心点为圆心，抬升一片区域形成山丘，Falloff控制边缘平滑度 | 参数: Map, Center-{X,Y}, Radius-半径(格), Height-最高点高度(cm), Falloff-衰减系数(0-1) | Env.RaiseTerrain(map, {X=50, Y=50}, 15, 800, 0.7)
+Env.LowerTerrain(Map, Center, Radius, Depth, Falloff) | void LowerTerrainArea(FMapHandle M, FIntPoint C, int32 R, float D, float F) | 以指定中心点为圆心，降低一片区域形成山谷或湖床 | 参数: Map, Center, Radius, Depth-深度(cm), Falloff | Env.LowerTerrain(map, {X=20, Y=20}, 10, 200, 0.5)
+Env.FlattenTerrain(Map, Center, Radius, Height) | void FlattenTerrainArea(FMapHandle M, FIntPoint C, int32 R, float H) | 将指定区域的地形平整到统一高度，适合建造建筑前的地基处理 | 参数: Map, Center, Radius, Height-目标高度 | Env.FlattenTerrain(map, {X=50, Y=42}, 12, 50)
+Env.SmoothTerrain(Map, Iterations) | void SmoothTerrainData(FMapHandle M, int32 Iter) | 对整个地形进行平滑处理，消除突兀的高度变化 | 参数: Map, Iterations-迭代次数(越多越平滑) | Env.SmoothTerrain(map, 3)
+Env.PaintTerrain(Map, X, Y, Radius, Material) | void PaintTerrainMaterial(FMapHandle M, int32 X, int32 Y, float R, FString Mat) | 在指定位置绘制地形材质贴图 | 参数: Map, X, Y, Radius, Material-"Grass"/"Sand"/"Stone"/"Snow"/"Dirt" | Env.PaintTerrain(map, 50, 50, 20, "Stone")
+Env.AddWaterBody(Map, Center, Size, Depth) | void AddWaterBodyData(FMapHandle M, FIntPoint C, FIntPoint Size, float Depth) | 在地图上添加一个水体区域（湖泊、池塘） | 参数: Map, Center-{X,Y}, Size-{X,Y}尺寸, Depth-水深(cm) | Env.AddWaterBody(map, {X=20, Y=20}, {X=18, Y=18}, 150)
+Env.GetTerrainHeight(Map, X, Y) | float GetTerrainHeightAt(FMapHandle M, int32 X, int32 Y) | 查询指定网格点的地形高度 | 参数: Map, X, Y 返回: float高度值 | local h = Env.GetTerrainHeight(map, 50, 50)
+Env.GetMapSize(Map) | FIntPoint GetMapGridSize(FMapHandle M) | 获取地图的网格尺寸 | 参数: Map 返回: {Width, Height} | local size = Env.GetMapSize(map)
+Env.GridToWorld(Map, X, Y) | FVector GridToWorldLocation(FMapHandle M, int32 X, int32 Y) | 将网格坐标转换为世界坐标 | 参数: Map, X, Y 返回: FVector{X,Y,Z} | local pos = Env.GridToWorld(map, 50, 50)
+Env.WorldToGrid(Map, Loc) | FIntPoint WorldToGridLocation(FMapHandle M, FVector Loc) | 将世界坐标转换为网格坐标 | 参数: Map, Loc-{X,Y,Z} 返回: {X, Y} | local grid = Env.WorldToGrid(map, {X=5000, Y=5000, Z=0})
+
+表格 2:
+Lua | C++ 签名 | 说明 | 参数与返回值 | 示例
+Env.AddBlock(Map, Name, GridPos, GridSize) | FBlockHandle AddBlockToMap(FMapHandle M, FString Name, FIntPoint Pos, FIntPoint Size) | 在地图中划分一个可玩区块，Block是内容组织的基本单位 | 参数: Map, Name-区块名, GridPos-{X,Y}起始位置, GridSize-{X,Y}尺寸 返回: BlockHandle | local village = Env.AddBlock(map, "新手村", {X=10, Y=10}, {X=20, Y=20})
+Env.SetBlockType(Block, Type) | void SetBlockType(FBlockHandle B, FString Type) | 设置Block的类型，影响自动装饰和AI行为 | 参数: Block, Type-"Village"/"Forest"/"Dungeon"/"Camp"/"Ruins" | Env.SetBlockType(village, "Village")
+Env.SetBlockProperty(Block, Key, Value) | void SetBlockProperty(FBlockHandle B, FString Key, FString Val) | 为Block设置自定义键值属性，用于游戏逻辑 | 参数: Block, Key-属性名, Value-属性值 | Env.SetBlockProperty(village, "SafeZone", "true")
+Env.GetBlockByName(Map, Name) | FBlockHandle GetBlockByName(FMapHandle M, FString Name) | 通过名称查找Block | 参数: Map, Name 返回: BlockHandle | local b = Env.GetBlockByName(map, "新手村")
+Env.GetAllBlocks(Map) | TArray<FBlockHandle> GetAllBlocksInMap(FMapHandle M) | 获取地图中所有Block的列表 | 参数: Map 返回: Block数组 | local blocks = Env.GetAllBlocks(map)
+Env.GetBlockBounds(Block) | FIntRect GetBlockGridBounds(FBlockHandle B) | 获取Block在地图网格中的边界矩形 | 参数: Block 返回: {Min{X,Y}, Max{X,Y}} | local bounds = Env.GetBlockBounds(village)
+Env.GetBlockCenter(Block) | FIntPoint GetBlockGridCenter(FBlockHandle B) | 获取Block的网格中心点 | 参数: Block 返回: {X, Y} | local center = Env.GetBlockCenter(village)
+Env.GetBlockWorldBounds(Map, Block) | FBox GetBlockWorldBounds(FMapHandle M, FBlockHandle B) | 获取Block在世界坐标系中的包围盒 | 参数: Map, Block 返回: FBox | local box = Env.GetBlockWorldBounds(map, village)
+Env.IsPointInBlock(Block, GridPos) | bool IsPointInsideBlock(FBlockHandle B, FIntPoint Pos) | 检查一个网格点是否在Block范围内 | 参数: Block, GridPos-{X,Y} 返回: bool | local inside = Env.IsPointInBlock(village, {X=15, Y=15})
+Env.BlockGridToWorld(Map, Block, LocalX, LocalY) | FVector BlockLocalToWorld(FMapHandle M, FBlockHandle B, int32 X, int32 Y) | 将Block内的局部网格坐标转换为世界坐标 | 参数: Map, Block, LocalX, LocalY 返回: FVector | local pos = Env.BlockGridToWorld(map, village, 10, 10)
+
+表格 3:
+Lua | C++ 签名 | 说明 | 参数与返回值 | 示例
+Env.AddBuilding(Block, LocalPos, Size, Style) | FBuildingHandle AddBuildingToBlock(FBlockHandle B, FIntPoint Pos, FIntPoint Size, FString Style) | 在Block中添加一个建筑物数据 | 参数: Block, LocalPos-{X,Y}局部位置, Size-{X,Y}占地, Style-风格 返回: BuildingHandle | local tavern = Env.AddBuilding(village, {X=5, Y=5}, {X=4, Y=3}, "Medieval")
+Env.SetBuildingType(Building, Type) | void SetBuildingType(FBuildingHandle B, FString Type) | 设置建筑的功能类型，影响内部布置 | 参数: Building, Type-"House"/"Shop"/"Tavern"/"Temple"/"Tower" | Env.SetBuildingType(tavern, "Tavern")
+Env.AddBuildingFloor(Building, Height) | int32 AddFloorToBuilding(FBuildingHandle B, float H) | 为建筑添加一个楼层 | 参数: Building, Height-层高(cm) 返回: 楼层索引 | Env.AddBuildingFloor(tavern, 300)
+Env.SetBuildingRoof(Building, RoofType) | void SetBuildingRoof(FBuildingHandle B, FString Type) | 设置建筑的屋顶样式 | 参数: Building, RoofType-"Flat"/"Pitched"/"Dome"/"None" | Env.SetBuildingRoof(tavern, "Pitched")
+Env.AddProp(Block, PropID, LocalPos, Rotation) | void AddPropToBlock(FBlockHandle B, FString ID, FVector LocalPos, FRotator Rot) | 在Block中放置一个静态道具 | 参数: Block, PropID-道具资产ID, LocalPos-{X,Y,Z}, Rotation-{Pitch,Yaw,Roll} | Env.AddProp(village, "Well", {X=800, Y=600, Z=0}, {Pitch=0, Yaw=0, Roll=0})
+Env.AddNPCSpawn(Block, NPCID, LocalPos, Rotation) | void AddNPCSpawnToBlock(FBlockHandle B, FString ID, FVector LocalPos, FRotator Rot) | 在Block中添加NPC生成点，Build后会实例化NPC | 参数: Block, NPCID, LocalPos, Rotation | Env.AddNPCSpawn(village, "NPC_Innkeeper", {X=500, Y=500, Z=0}, {Pitch=0, Yaw=180, Roll=0})
+Env.AddEnemySpawn(Block, EnemyID, LocalPos, PatrolRadius) | void AddEnemySpawnToBlock(FBlockHandle B, FString ID, FVector LocalPos, float Radius) | 在Block中添加敌人生成点，包含巡逻范围 | 参数: Block, EnemyID, LocalPos, PatrolRadius-巡逻半径(cm) | Env.AddEnemySpawn(forest, "Wolf", {X=300, Y=400, Z=0}, 500)
+Env.AddInteractable(Block, Type, LocalPos, Script) | void AddInteractableToBlock(FBlockHandle B, FString Type, FVector Pos, FString Script) | 添加可交互物体，附带交互时执行的Lua脚本 | 参数: Block, Type-"Chest"/"Door"/"Lever", LocalPos, Script-Lua代码 | Env.AddInteractable(forest, "Chest", {X=1500, Y=1000, Z=0}, [[UI.Toast("发现宝箱!")]])
+Env.AddTriggerZone(Block, LocalPos, Size, TriggerType, Script) | void AddTriggerZoneToBlock(FBlockHandle B, FVector Pos, FVector Size, FString Type, FString Script) | 添加触发区域，玩家进入时执行脚本 | 参数: Block, LocalPos, Size-{X,Y,Z}, TriggerType, Script | Env.AddTriggerZone(mine, {X=500, Y=500, Z=0}, {X=300, Y=300, Z=200}, "EnterRange", [[Log("进入区域")]])
+Env.AddSpawnPoint(Block, Tag, LocalPos) | void AddSpawnPointToBlock(FBlockHandle B, FString Tag, FVector Pos) | 添加通用生成点，用于玩家出生或动态生成 | 参数: Block, Tag-标签名, LocalPos | Env.AddSpawnPoint(village, "PlayerStart", {X=200, Y=200, Z=0})
+Env.FindEmptySpace(Block, Size) | FVector FindEmptySpaceInBlock(FBlockHandle B, FVector2D Size) | 在Block中自动寻找一块空白区域 | 参数: Block, Size-{X,Y}所需尺寸 返回: 位置或{-1,-1,-1}表示未找到 | local pos = Env.FindEmptySpace(forest, {X=200, Y=200})
+Env.IsSpaceEmpty(Block, LocalPos, Size) | bool IsSpaceEmptyInBlock(FBlockHandle B, FVector Pos, FVector2D Size) | 检查Block中指定区域是否为空 | 参数: Block, LocalPos, Size 返回: bool | local empty = Env.IsSpaceEmpty(village, {X=100, Y=100, Z=0}, {X=50, Y=50})
+
+表格 4:
+Lua | C++ 签名 | 说明 | 参数与返回值 | 示例
+Env.AddRoad(Map, BlockA, BlockB, Width, RoadType) | FConnectionHandle AddRoadConnection(FMapHandle M, FBlockHandle A, FBlockHandle B, float W, FString Type) | 在两个Block之间创建道路连接，自动寻路并修改地形 | 参数: Map, BlockA, BlockB, Width-宽度(cm), RoadType-"Dirt"/"Stone"/"Wooden" 返回: ConnectionHandle | Env.AddRoad(map, village, forest, 300, "Dirt")
+Env.AddBridge(Map, BlockA, BlockB, Width) | FConnectionHandle AddBridgeConnection(FMapHandle M, FBlockHandle A, FBlockHandle B, float W) | 在两个Block之间创建桥梁，用于跨越水体或深谷 | 参数: Map, BlockA, BlockB, Width 返回: ConnectionHandle | Env.AddBridge(map, forest, ruins, 400)
+Env.AddTeleport(Map, BlockA, PosA, BlockB, PosB) | FConnectionHandle AddTeleportConnection(FMapHandle M, FBlockHandle A, FVector PosA, FBlockHandle B, FVector PosB) | 在两个Block之间创建传送门连接 | 参数: Map, BlockA, PosA-A侧位置, BlockB, PosB-B侧位置 返回: ConnectionHandle | Env.AddTeleport(map, village, {X=1800, Y=1000, Z=0}, ruins, {X=100, Y=100, Z=0})
+Env.AddStairs(Map, BlockA, BlockB, Width) | FConnectionHandle AddStairsConnection(FMapHandle M, FBlockHandle A, FBlockHandle B, float W) | 在两个有高度差的Block之间创建楼梯 | 参数: Map, BlockA, BlockB, Width 返回: ConnectionHandle | Env.AddStairs(map, lowBlock, highBlock, 200)
+Env.SetConnectionProperty(Connection, Key, Value) | void SetConnectionProperty(FConnectionHandle C, FString Key, FString Val) | 为连接设置自定义属性，如解锁条件 | 参数: Connection, Key, Value | Env.SetConnectionProperty(teleport, "RequireUnlock", "true")
+Env.GetConnections(Map, Block) | TArray<FConnectionHandle> GetBlockConnections(FMapHandle M, FBlockHandle B) | 获取指定Block的所有连接 | 参数: Map, Block 返回: Connection数组 | local conns = Env.GetConnections(map, village)
+Env.AreBlocksConnected(Map, BlockA, BlockB) | bool AreBlocksConnected(FMapHandle M, FBlockHandle A, FBlockHandle B) | 检查两个Block是否已有连接 | 参数: Map, BlockA, BlockB 返回: bool | local connected = Env.AreBlocksConnected(map, village, forest)
+
+表格 5:
+Lua | C++ 签名 | 说明 | 参数与返回值 | 示例
+Env.AutoPaintTerrain(Map) | void AutoPaintTerrainByHeight(FMapHandle M) | 根据地形高度和坡度自动绘制材质（低=草，高=石，陡=岩） | 参数: Map | Env.AutoPaintTerrain(map)
+Env.AutoGenerateRoads(Map) | void AutoGenerateRoadsBetweenBlocks(FMapHandle M) | 使用最小生成树算法自动在所有Block之间生成道路网络 | 参数: Map | Env.AutoGenerateRoads(map)
+Env.AutoAddVegetation(Map, Density) | void AutoGenerateVegetation(FMapHandle M, float Density) | 使用泊松圆盘采样在整个地图自动添加植被 | 参数: Map, Density-密度(0-1) | Env.AutoAddVegetation(map, 0.6)
+Env.AutoAddVegetationInBlock(Block, Density, VegType) | void AutoGenerateVegetationInBlock(FBlockHandle B, float Density, FString Type) | 在指定Block内添加特定类型的植被 | 参数: Block, Density, VegType-"Forest"/"Grass"/"Mixed" | Env.AutoAddVegetationInBlock(forest, 0.85, "Forest")
+Env.AutoDecorate(Map) | void AutoDecorateMap(FMapHandle M) | 自动美化整个地图，添加路灯、指示牌、地面细节等 | 参数: Map | Env.AutoDecorate(map)
+Env.AutoDecorateBlock(Block) | void AutoDecorateBlock(FBlockHandle B) | 根据Block类型自动添加装饰物 | 参数: Block | Env.AutoDecorateBlock(village)
+Env.AutoPlaceProps(Block, PropSet, Count) | void AutoPlacePropsInBlock(FBlockHandle B, FString PropSet, int32 Cnt) | 在Block中自动放置指定道具组 | 参数: Block, PropSet-道具组ID, Count-数量 | Env.AutoPlaceProps(village, "Village_Props", 20)
+Env.AutoFurnishBuilding(Building, Preset) | void AutoFurnishBuildingByPreset(FBuildingHandle B, FString Preset) | 根据预设自动布置建筑内部家具 | 参数: Building, Preset-预设名 | Env.AutoFurnishBuilding(tavern, "Tavern")
+Env.AutoGeneratePatrolRoutes(Block, Count) | void AutoGeneratePatrolRoutes(FBlockHandle B, int32 Count) | 在Block中自动生成敌人巡逻路线 | 参数: Block, Count-路线数量 | Env.AutoGeneratePatrolRoutes(forest, 3)
+
+表格 6:
+Lua | C++ 签名 | 说明 | 参数与返回值 | 示例
+Env.GenMapFromTemplate(Template, Seed) | FMapHandle GenerateMapFromTemplate(FString Template, int32 Seed) | 从预定义模板生成完整地图 | 参数: Template-模板名, Seed-随机种子 返回: MapHandle | local map = Env.GenMapFromTemplate("OpenWorld_Medium", 12345)
+Env.GenDungeonBlock(Map, GridPos, GridSize, Seed) | FBlockHandle GenerateDungeonBlock(FMapHandle M, FIntPoint Pos, FIntPoint Size, int32 Seed) | 使用BSP算法程序化生成地牢Block | 参数: Map, GridPos, GridSize, Seed 返回: BlockHandle | local dungeon = Env.GenDungeonBlock(map, {X=110, Y=60}, {X=25, Y=25}, 333)
+Env.GenCaveBlock(Map, GridPos, GridSize, FillPercent, Seed) | FBlockHandle GenerateCaveBlock(FMapHandle M, FIntPoint Pos, FIntPoint Size, float Fill, int32 Seed) | 使用元胞自动机算法生成洞穴Block | 参数: Map, GridPos, GridSize, FillPercent-填充率(0-1), Seed 返回: BlockHandle | local cave = Env.GenCaveBlock(map, {X=50, Y=50}, {X=30, Y=30}, 0.45, 444)
+Env.GenVillageBlock(Map, GridPos, GridSize, BuildingCount, Seed) | FBlockHandle GenerateVillageBlock(FMapHandle M, FIntPoint Pos, FIntPoint Size, int32 Bldgs, int32 Seed) | 程序化生成村庄Block，包含建筑和道路 | 参数: Map, GridPos, GridSize, BuildingCount, Seed 返回: BlockHandle | local village = Env.GenVillageBlock(map, {X=20, Y=20}, {X=30, Y=30}, 8, 111)
+Env.GenForestBlock(Map, GridPos, GridSize, TreeDensity, Seed) | FBlockHandle GenerateForestBlock(FMapHandle M, FIntPoint Pos, FIntPoint Size, float Density, int32 Seed) | 程序化生成森林Block | 参数: Map, GridPos, GridSize, TreeDensity-树木密度(0-1), Seed 返回: BlockHandle | local forest = Env.GenForestBlock(map, {X=60, Y=20}, {X=40, Y=50}, 0.7, 222)
+Env.GenMazeBlock(Map, GridPos, GridSize, Seed) | FBlockHandle GenerateMazeBlock(FMapHandle M, FIntPoint Pos, FIntPoint Size, int32 Seed) | 程序化生成迷宫Block | 参数: Map, GridPos, GridSize, Seed 返回: BlockHandle | local maze = Env.GenMazeBlock(map, {X=80, Y=80}, {X=20, Y=20}, 555)
+Env.GenRiver(Map, StartEdge, EndEdge, Width) | void GenerateRiverPath(FMapHandle M, FString Start, FString End, float W) | 在地图上生成一条河流，自动处理地形 | 参数: Map, StartEdge-"N"/"S"/"E"/"W", EndEdge, Width-宽度(cm) | Env.GenRiver(map, "N", "S", 500)
+Env.GenMountainRange(Map, StartPos, EndPos, Height, Width) | void GenerateMountainRange(FMapHandle M, FIntPoint S, FIntPoint E, float H, int32 W) | 在地图上生成一条山脉 | 参数: Map, StartPos, EndPos, Height-高度(cm), Width-宽度(格) | Env.GenMountainRange(map, {X=0, Y=75}, {X=150, Y=75}, 1000, 10)
+
+表格 7:
+Lua | C++ 签名 | 说明 | 参数与返回值 | 示例 |  |  |  | 
+Env.SetTimeOfDay(Map, Hour) | void SetMapTimeOfDay(FMapHandle M, float Hour) | 设置地图的初始时间，影响光照和天空 | 参数: Map, Hour-小时(0-24) | Env.SetTimeOfDay(map, 10) |  |  |  | 
+Env.SetWeather(Map, Weather) | void SetMapWeather(FMapHandle M, FString Weather) | 设置地图的初始天气 | 参数: Map, Weather-"Clear"/"Cloudy"/"Rain"/"Snow"/"Fog"/"Storm" | Env.SetWeather(map, "Clear") |  |  |  | 
+Env.SetFogDensity(Map, Density) | void SetMapFogDensity(FMapHandle M, float Density) | 设置全局雾气密度 | 参数: Map, Density-密度(0-1) | Env.SetFogDensity(map, 0.3) |  |  |  | 
+Env.SetAmbientSound(Map, SoundID) | void SetMapAmbientSound(FMapHandle M, FString ID) | 设置全局环境音效 | 参数: Map, SoundID-音效资产ID | Env.SetAmbientSound(map, "Nature_Peaceful") |  |  |  | 
+Env.SetBlockAmbience(Block, SoundID, LightColor) | void SetBlockAmbience(FBlockHandle B, FString Sound, FLinearColor Light) | 为特定Block设置独立的氛围，覆盖全局设置 | 参数: Block, SoundID, LightColor-{R,G,B,A} | Env.SetBlockAmbience(forest, "Forest_Mysterious", {R=0.7, G=0.8, B=0.6, A=1}) |  |  |  | 
+Env.AddLightData(Block, LocalPos, Type, Color, Intensity) | void AddLightToBlock(FBlockHandle B, FVector Pos, FString Type, FLinearColor C, float I) | 在Block中添加光源数 | 参数: Block, LocalPos-{X,Y,Z}, Type-"Point"/"Spot", Color-{R,G,B,A}, Intensity-强度 | Env.AddLightData(village, {X=200, Y=200, Z=300}, "Point", {R=1, G=0.9, B=0.7, A=1}, 1000) | | nv.AddLightData(Block, LocalPos, Type, Color, Intensity) | void AddLightToBlock(FBlockHandle B, FVector Pos, FString Type, FLinearColor C, float I) | 在Block中添加光源数 |  | 
+
+表格 8:
+Lua | C++ 签名 | 说明 | 参数与返回值 | 示例
+Env.SaveMap(Map, SlotName) | bool SaveMapToSlot(FMapHandle M, FString Slot) | 将地图数据序列化保存到指定槽位 | 参数: Map, SlotName-槽位名 返回: bool成功与否 | Env.SaveMap(map, "MyLevel_v1")
+Env.LoadMap(SlotName) | FMapHandle LoadMapFromSlot(FString Slot) | 从槽位加载地图数据 | 参数: SlotName 返回: MapHandle | local map = Env.LoadMap("MyLevel_v1")
+Env.ValidateMap(Map) | TArray<FString> ValidateMapData(FMapHandle M) | 验证地图数据完整性，检查Block重叠、连接有效性等 | 参数: Map 返回: 错误信息数组(空=无错误) | local errors = Env.ValidateMap(map)
+Env.Build(Map) | AActor* BuildLevel(FMapHandle M) | 同步构建Level，将所有数据实例化为Actor | 参数: Map 返回: Level根Actor | local level = Env.Build(map)
+Env.BuildAsync(Map) | AActor* BuildLevelAsy(FMapHandle M, UCineTextLatentHandle* Handle) | 异步构建Level，不阻塞主线程，完成后回调 | 参数: Map, 回调函数 | Env.BuildAsync(map, function(root) Log("完成") end)
+Env.GetLevelRoot() | AActor* GetCurrentLevelRoot() | 获取当前已构建Level的根Actor | 返回: Actor | local root = Env.GetLevelRoot()
+Env.DestroyLevel(LevelRoot) | void DestroyLevelInstance(AActor* Root) | 销毁已构建的Level实例 | 参数: LevelRoot-根Actor | Env.DestroyLevel(root)
+
+表格 9:
+Lua | C++ 签名 | 说明 | 参数与返回值 | 示例
+Env.SpawnProp(PropID, WorldPos, Rotation) | AActor* SpawnPropRuntime(FString ID, FVector Pos, FRotator Rot) | 运行时在世界坐标生成道具 | 参数: PropID, WorldPos-{X,Y,Z}, Rotation-{Pitch,Yaw,Roll} 返回: Actor | local prop = Env.SpawnProp("Barrel", {X=1000, Y=2000, Z=0}, {Pitch=0, Yaw=0, Roll=0})
+Env.SpawnLoot(WorldPos, LootTable) | TArray<AActor*> SpawnLootRuntime(FVector Pos, FString Table) | 根据掉落表生成掉落物 | 参数: WorldPos, LootTable-掉落表ID 返回: Actor数组 | local items = Env.SpawnLoot({X=500, Y=500, Z=0}, "Forest_Loot")
+Env.SpawnProjectile(ID, Start, Direction, Speed) | AActor* SpawnProjectileRuntime(FString ID, FVector Start, FVector Dir, float Speed) | 生成投射物（箭矢、魔法弹等） | 参数: ID, Start, Direction, Speed 返回: Actor | Env.SpawnProjectile("Arrow", pos, dir, 2000)
+Env.DestroyProp(Prop) | void DestroyPropRuntime(AActor* Prop) | 销毁运行时生成的道具 | 参数: Prop-Actor | Env.DestroyProp(barrel)
+Env.SpawnWall(Start, End, Height, Material) | AActor* SpawnWallRuntime(FVector S, FVector E, float H, FString Mat) | 运行时生成墙壁 | 参数: Start, End, Height, Material 返回: Actor | Env.SpawnWall({X=0,Y=0,Z=0}, {X=500,Y=0,Z=0}, 300, "Stone")
+Env.SpawnBarricade(WorldPos, Rotation, Type) | AActor* SpawnBarricadeRuntime(FVector Pos, FRotator Rot, FString Type) | 生成路障 | 参数: WorldPos, Rotation, Type 返回: Actor | Env.SpawnBarricade(pos, rot, "Wooden")
+Env.SpawnPlatform(WorldPos, Size, MovePoints, Speed) | AActor* SpawnMovingPlatformRuntime(FVector Pos, FVector2D Size, TArray<FVector> Pts, float Speed) | 生成移动平台 | 参数: WorldPos, Size, MovePoints-路径点数组, Speed 返回: Actor | Env.SpawnPlatform(pos, {X=200,Y=200}, {p1, p2, p3}, 100)
+Env.CollapseTerrain(WorldPos, Radius, Depth) | void CollapseTerrainRuntime(FVector Pos, float R, float D) | 运行时地形塌陷效果 | 参数: WorldPos, Radius, Depth | Env.CollapseTerrain({X=1000, Y=1000, Z=0}, 500, 200)
+Env.SpawnLight(WorldPos, Type, Color, Intensity) | AActor* SpawnLightRuntime(FVector Pos, FString Type, FLinearColor C, float I) | 运行时生成光源 | 参数: WorldPos, Type-"Point"/"Spot", Color, Intensity 返回: Actor | Env.SpawnLight(pos, "Point", {R=1,G=1,B=1,A=1}, 500)
+Env.SpawnTorch(WorldPos) | AActor* SpawnTorchRuntime(FVector Pos) | 生成火把（带火焰特效和光源） | 参数: WorldPos 返回: Actor | Env.SpawnTorch({X=100, Y=200, Z=150})
+Env.SpawnFX(FXID, WorldPos, Rotation, Scale) | AActor* SpawnFXRuntime(FString ID, FVector Pos, FRotator Rot, float Scale) | 生成粒子特效 | 参数: FXID, WorldPos, Rotation, Scale 返回: Actor | Env.SpawnFX("Explosion", pos, rot, 2.0)
+Env.SetLightColor(Light, Color) | void SetLightColorRuntime(AActor* L, FLinearColor C) | 修改光源颜色 | 参数: Light-Actor, Color | Env.SetLightColor(light, {R=1, G=0, B=0, A=1})
+Env.FlickerLight(Light, Duration, Frequency) | void FlickerLightRuntime(AActor* L, float Duration, float Freq) | 让光源闪烁 | 参数: Light, Duration-持续秒数, Frequency-频率 | Env.FlickerLight(torch, 5.0, 10)
+Env.TransitionTime(TargetHour, Duration) | void TransitionTimeOfDay(float Hour, float Duration) | 平滑过渡到目标时间 | 参数: TargetHour-目标小时, Duration-过渡秒数 | Env.TransitionTime(20, 10)
+Env.TransitionWeather(Weather, Duration) | void TransitionWeatherRuntime(FString Weather, float Duration) | 平滑过渡到目标天气 | 参数: Weather, Duration | Env.TransitionWeather("Rain", 30)
+Env.SetFogDensityRuntime(Density) | void SetFogDensityRuntime(float D) | 运行时修改雾气密度 | 参数: Density | Env.SetFogDensityRuntime(0.8)
+Env.PlayEnvEvent(EventID, WorldPos) | void PlayEnvironmentEvent(FString ID, FVector Pos) | 触发环境事件 | 参数: EventID-"Lightning"/"Earthquake"/"Explosion", WorldPos | Env.PlayEnvEvent("Lightning", {X=500, Y=500, Z=1000})
+Env.ShakeCamera(Intensity, Duration) | void ShakeCameraRuntime(float Intensity, float Duration) | 镜头震动效果 | 参数: Intensity-强度, Duration-持续秒数 | Env.ShakeCamera(0.5, 1.0)
+Env.SpawnTrigger(WorldPos, TriggerType, Range, Script) | AActor* SpawnTriggerRuntime(FVector Pos, FString Type, float Range, FString Script) | 运行时生成触发器 | 参数: WorldPos, TriggerType, Range, Script 返回: Actor | Env.SpawnTrigger(pos, "Enter", 200, [[Log("触发")]])
+Env.SpawnHazardZone(WorldPos, Size, DPS, DamageType) | AActor* SpawnHazardZoneRuntime(FVector Pos, FVector Size, float DPS, FString Type) | 生成伤害区域 | 参数: WorldPos, Size, DPS-每秒伤害, DamageType 返回: Actor | Env.SpawnHazardZone(pos, {X=500,Y=500,Z=100}, 10, "Fire")
+Env.RemoveTrigger(Trigger) | void RemoveTriggerRuntime(AActor* Trigger) | 移除触发器 | 参数: Trigger-Actor | Env.RemoveTrigger(trigger)
+Env.GetBlockAtWorldPos(WorldPos) | AActor* GetBlockActorAtLocation(FVector Pos) | 获取世界坐标所在的Block Actor | 参数: WorldPos 返回: Block Actor | local block = Env.GetBlockAtWorldPos(playerPos)
+Env.GetTerrainHeightAt(WorldPos) | float GetTerrainHeightAtRuntime(FVector Pos) | 运行时获取地形高度 | 参数: WorldPos 返回: float | local h = Env.GetTerrainHeightAt({X=1000, Y=1000, Z=0})
+Env.GetRandomNavPoint(Origin, Radius) | FVector GetRandomNavigablePoint(FVector Origin, float R) | 获取随机可导航点 | 参数: Origin-中心, Radius 返回: FVector | local point = Env.GetRandomNavPoint(pos, 500)
+Env.IsLocationReachable(Start, End) | bool IsLocationReachable(FVector S, FVector E) | 检查两点之间是否可达 | 参数: Start, End 返回: bool | local ok = Env.IsLocationReachable(a, b)
+Env.UpdateNavMesh(Bounds) | void UpdateNavMeshInBounds(FBox Bounds) | 更新指定范围的导航网格 | 参数: Bounds-包围盒 | Env.UpdateNavMesh(box)
+
+表格 10:
+函数 | 类别 | 原子性 | LLM适用度 | 说明
+Env.CreateMap(W, H, CellSize) | 创建 | ★★★ | 极高 | 一切的起点，创建空白画布
+Env.AddBlock(Map, Name, GridPos, GridSize) | 创建 | ★★★ | 极高 | 划分区域，是内容组织的核心
+Env.SetBlockType(Block, Type) | 设置 | ★★★ | 极高 | 定义区域性质
+Env.AddRoad(Map, BlockA, BlockB, Width, Type) | 连接 | ★★★ | 极高 | 连接区域，形成可通行网络
+Env.Build(Map) / Env.BuildAsync(Map) | 构建 | ★★★ | 极高 | 将数据实例化为可玩关卡
+
+表格 11:
+函数 | 原子性 | LLM适用度 | 推荐场景
+Env.RaiseTerrain(Map, Center, Radius, Height, Falloff) | ★★★ | 极高 | 创建山丘、高地
+Env.LowerTerrain(Map, Center, Radius, Depth, Falloff) | ★★★ | 极高 | 创建山谷、湖床
+Env.FlattenTerrain(Map, Center, Radius, Height) | ★★★ | 极高 | 建筑地基、平台
+Env.AddWaterBody(Map, Center, Size, Depth) | ★★★ | 极高 | 添加湖泊、池塘
+Env.SmoothTerrain(Map, Iterations) | ★★☆ | 高 | 最后平滑处理
+Env.PaintTerrain(Map, X, Y, Radius, Material) | ★★☆ | 中 | 手动绘制材质（通常用Auto）
+
+表格 12:
+函数 | 原子性 | LLM适用度 | 推荐场景
+Env.AddBuilding(Block, LocalPos, Size, Style) | ★★★ | 极高 | 添加建筑
+Env.SetBuildingType(Building, Type) | ★★★ | 极高 | 定义建筑功能
+Env.AddNPCSpawn(Block, NPCID, LocalPos, Rotation) | ★★★ | 极高 | 放置NPC
+Env.AddEnemySpawn(Block, EnemyID, LocalPos, PatrolRadius) | ★★★ | 极高 | 放置敌人
+Env.AddProp(Block, PropID, LocalPos, Rotation) | ★★☆ | 高 | 放置道具
+Env.AddInteractable(Block, Type, LocalPos, Script) | ★★☆ | 高 | 添加可交互物
+Env.AddSpawnPoint(Block, Tag, LocalPos) | ★★★ | 极高 | 玩家出生点
+Env.AddTriggerZone(Block, LocalPos, Size, Type, Script) | ★★☆ | 中 | 触发区域（需要脚本）
+
+表格 13:
+函数 | 自动化程度 | LLM适用度 | 说明
+Env.AutoPaintTerrain(Map) | ★★★ | 极高 | 自动根据高度绘制材质，省去手动PaintTerrain
+Env.AutoGenerateRoads(Map) | ★★★ | 极高 | 自动连接所有Block，省去手动AddRoad
+Env.AutoAddVegetation(Map, Density) | ★★★ | 极高 | 自动添加植被，一行代码美化整个地图
+Env.AutoDecorate(Map) | ★★★ | 极高 | 自动添加装饰物
+Env.AutoFurnishBuilding(Building, Preset) | ★★★ | 极高 | 自动布置建筑内部
+Env.AutoAddVegetationInBlock(Block, Density, Type) | ★★☆ | 高 | 针对特定Block的植被
+
+表格 14:
+函数 | 复杂度 | LLM适用度 | 说明
+Env.GenVillageBlock(...) | ★★☆ | 高 | 一键生成村庄
+Env.GenForestBlock(...) | ★★☆ | 高 | 一键生成森林
+Env.GenDungeonBlock(...) | ★★★ | 中 | 生成地牢（复杂）
+Env.GenRiver(Map, StartEdge, EndEdge, Width) | ★★☆ | 高 | 生成河流
+Env.GenMountainRange(...) | ★★☆ | 高 | 生成山脉
+
+表格 15:
+类别 | 推荐函数 | 备注
+必用 | CreateMap, AddBlock, SetBlockType, Build | 每个关卡必须
+地形 | RaiseTerrain, LowerTerrain, AddWaterBody | 按需使用
+内容 | AddBuilding, AddNPCSpawn, AddEnemySpawn, AddSpawnPoint | 核心玩法
+连接 | AddRoad 或 AutoGenerateRoads | 二选一
+美化 | AutoPaintTerrain, AutoAddVegetation, AutoDecorate | 强烈推荐
+氛围 | SetTimeOfDay, SetWeather | 可选
+高级 | Gen*Block 系列 | 程序化生成
