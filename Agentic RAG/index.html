@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agentic RAG - LUA脚本生成系统</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
 </head>
 <body>
     <div class="container">
@@ -16,6 +17,34 @@
         <div class="main-content">
             <!-- 左侧：配置面板 -->
             <div class="config-panel">
+                <div class="panel-section">
+                    <h2>生成模式</h2>
+                    
+                    <div class="form-group">
+                        <label for="generation-mode">
+                            生成类型
+                            <span class="tooltip" data-tooltip="选择生成地图脚本还是奇遇脚本">ℹ️</span>
+                        </label>
+                        <select id="generation-mode" class="form-control">
+                            <option value="map">🗺️ 地图生成</option>
+                            <option value="encounter">⚔️ 奇遇生成</option>
+                        </select>
+                    </div>
+                    
+                    <div id="npc-tags-group" class="form-group" style="display: none;">
+                        <label for="npc-tags">
+                            NPC标签（可选）
+                            <span class="tooltip" data-tooltip="奇遇中的NPC标签，用逗号分隔，如：Tag_A, Tag_B">ℹ️</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="npc-tags" 
+                            class="form-control" 
+                            placeholder="Tag_A, Tag_B, Tag_C"
+                        >
+                    </div>
+                </div>
+
                 <div class="panel-section">
                     <h2>模型配置</h2>
                     
@@ -132,7 +161,7 @@
                     <textarea 
                         id="user-input" 
                         class="input-textarea" 
-                        placeholder="请描述你想要创建的地图场景，例如：&#10;&#10;创建一个新手村地图，包含：&#10;- 中央有一个中世纪风格的村庄，有酒馆、商店和铁匠铺&#10;- 村庄北边是一片迷雾森林，有1-5级的怪物&#10;- 村庄东南角有一个废弃矿洞入口，需要完成特定任务才能进入&#10;- 村庄西边有一个训练场&#10;- 西北角有一个湖泊，湖边有渔夫小屋&#10;- 村庄和各个区域之间有道路连接&#10;&#10;请详细描述你的需求..."
+                        placeholder="请输入你的需求..."
                         rows="12"
                     ></textarea>
                     

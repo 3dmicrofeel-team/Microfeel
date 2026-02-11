@@ -8,7 +8,8 @@ const config = {
     presencePenalty: 0.0,
     agentMode: 'standard',
     maxIterations: 3,
-    apiKey: '' // API密钥
+    apiKey: '', // API密钥
+    generationMode: 'map' // 生成模式：map或encounter
 };
 
 // 从URL参数获取后端端口，或使用localStorage，默认5000
@@ -29,6 +30,9 @@ const elements = {
     clearApiKeyBtn: document.getElementById('clear-api-key-btn'),
     toggleApiKeyBtn: document.getElementById('toggle-api-key-btn'),
     apiKeyStatus: document.getElementById('api-key-status'),
+    generationMode: document.getElementById('generation-mode'),
+    npcTagsGroup: document.getElementById('npc-tags-group'),
+    npcTags: document.getElementById('npc-tags'),
     modelSelect: document.getElementById('model-select'),
     temperature: document.getElementById('temperature'),
     maxTokens: document.getElementById('max-tokens'),
@@ -55,8 +59,8 @@ const elements = {
     iterValue: document.getElementById('iter-value')
 };
 
-// 示例输入
-const exampleInput = `创建一个新手村地图，包含：
+// 示例输入（地图模式）
+const exampleInputMap = `创建一个新手村地图，包含：
 
 - 中央有一个中世纪风格的村庄，包含：
   * 一个两层楼的酒馆，有自动装饰
@@ -72,7 +76,7 @@ const exampleInput = `创建一个新手村地图，包含：
   * 一些可采集的草药节点
 
 - 村庄东南角有一个废弃矿洞入口，包含：
-  * 需要完成特定任务才能进入（检查Player:HasFlag("Mine_Unlocked")）
+  * 需要完成特定任务才能进入（检查Player:HasFlag('Mine_Unlocked')）
   * 3-8级的怪物等级
 
 - 村庄东边有一个训练场
@@ -95,6 +99,11 @@ const exampleInput = `创建一个新手村地图，包含：
   * 上午10点，晴天
   * 自然和平的音效
   * 森林有神秘的氛围光效`;
+
+// 示例输入（奇遇模式）
+const exampleInputEncounter = `我想要一个在酒馆发生的偷窃事件，玩家可以选择介入、旁观或离开。`;
+
+// 当前示例输入（已废弃，使用exampleInputMap和exampleInputEncounter）
 
 // API Key管理
 function loadApiKey() {
@@ -240,6 +249,30 @@ function init() {
         elements.iterValue.textContent = config.maxIterations;
     });
 
+    // 生成模式切换
+    elements.generationMode.addEventListener('change', (e) => {
+        const mode = e.target.value;
+        config.generationMode = mode;
+        
+        // 显示/隐藏NPC标签输入
+        if (mode === 'encounter') {
+            elements.npcTagsGroup.style.display = 'block';
+            elements.userInput.placeholder = '请输入你对奇遇的要求，例如：我想要一个在酒馆发生的偷窃事件，玩家可以选择介入、旁观或离开。';
+        } else {
+            elements.npcTagsGroup.style.display = 'none';
+            elements.userInput.placeholder = '请输入你对地图的要求，例如：创建一个新手村地图，包含村庄、森林、矿洞等区域...';
+        }
+    });
+    
+    // 初始化模式显示
+    const initialMode = elements.generationMode.value || 'map';
+    if (initialMode === 'encounter') {
+        elements.npcTagsGroup.style.display = 'block';
+        elements.userInput.placeholder = '请输入你对奇遇的要求，例如：我想要一个在酒馆发生的偷窃事件，玩家可以选择介入、旁观或离开。';
+    } else {
+        elements.userInput.placeholder = '请输入你对地图的要求，例如：创建一个新手村地图，包含村庄、森林、矿洞等区域...';
+    }
+
     elements.generateBtn.addEventListener('click', handleGenerate);
     elements.clearBtn.addEventListener('click', handleClear);
     elements.exampleBtn.addEventListener('click', handleLoadExample);
@@ -251,9 +284,10 @@ function init() {
 // 处理生成
 async function handleGenerate() {
     const userInput = elements.userInput.value.trim();
+    const generationMode = elements.generationMode.value || 'map';
     
     if (!userInput) {
-        alert('请输入地图描述！');
+        alert(generationMode === 'encounter' ? '请输入奇遇描述！' : '请输入地图描述！');
         return;
     }
 
@@ -279,8 +313,19 @@ async function handleGenerate() {
         // 始终从localStorage获取真实密钥（如果已保存）
         const savedApiKey = localStorage.getItem('openai_api_key') || '';
         
+        // 解析NPC标签（奇遇模式）
+        let npcTags = null;
+        if (generationMode === 'encounter') {
+            const npcTagsInput = elements.npcTags.value.trim();
+            if (npcTagsInput) {
+                npcTags = npcTagsInput.split(',').map(tag => tag.trim()).filter(tag => tag);
+            }
+        }
+        
         const requestData = {
             input: userInput,
+            mode: generationMode,
+            npcTags: npcTags,
             config: {
                 model: config.model,
                 temperature: config.temperature,
@@ -421,7 +466,12 @@ function handleClear() {
 
 // 加载示例
 function handleLoadExample() {
-    elements.userInput.value = exampleInput;
+    const generationMode = elements.generationMode.value || 'map';
+    if (generationMode === 'encounter') {
+        elements.userInput.value = exampleInputEncounter;
+    } else {
+        elements.userInput.value = exampleInputMap;
+    }
 }
 
 // 复制代码

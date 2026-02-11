@@ -9,12 +9,14 @@ import os
 from typing import Dict, Any, List
 import json
 from knowledge_base import get_knowledge_base, KnowledgeBase
+from encounter_rag_system import EncounterRAGSystem
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 
 # 初始化知识库
 kb = get_knowledge_base()
+gameplay_kb = None  # 延迟初始化
 
 # 配置
 API_CONFIG = {
@@ -453,31 +455,64 @@ end"""
 def generate_lua():
     """
     API端点：生成LUA脚本
+    支持两种模式：
+    - map: 地图生成（使用AgenticRAGSystem）
+    - encounter: 奇遇生成（使用EncounterRAGSystem）
     """
     try:
         data = request.get_json()
         user_input = data.get('input', '')
         config = data.get('config', {})
+        generation_mode = data.get('mode', 'map')  # 默认地图模式
         
         if not user_input:
             return jsonify({'error': '输入不能为空'}), 400
         
         # 处理API Key（优先使用前端传入的，否则使用环境变量）
-        # API Key会直接传递给AgenticRAGSystem，不需要修改环境变量
-        # AgenticRAGSystem会在调用时优先使用config中的apiKey
+        # API Key会直接传递给RAG系统，不需要修改环境变量
         
-        # 创建Agentic RAG系统（config中已包含apiKey）
-        rag_system = AgenticRAGSystem(config)
-        
-        # 生成LUA脚本
-        lua_script = rag_system.generate(user_input)
-        
-        return jsonify({
-            'success': True,
-            'luaScript': lua_script,
-            'model': config.get('model', 'gpt-4.1'),
-            'agentMode': config.get('agentMode', 'standard')
-        })
+        if generation_mode == 'encounter':
+            # 奇遇生成模式 - 使用奇遇知识库（GameplayKnowledgeBase）
+            npc_tags = data.get('npcTags', None)  # 可选的NPC标签列表
+            
+            # 延迟初始化奇遇知识库（向量数据库：chroma_db_gameplay）
+            global gameplay_kb
+            if gameplay_kb is None:
+                from gameplay_knowledge_base import get_gameplay_knowledge_base
+                gameplay_kb = get_gameplay_knowledge_base()
+                print(f"[INFO] 奇遇知识库已加载，包含 {len(gameplay_kb.functions)} 个API函数")
+            
+            # 创建奇遇RAG系统（使用奇遇知识库）
+            encounter_system = EncounterRAGSystem(config)
+            
+            # 生成奇遇LUA脚本
+            lua_script = encounter_system.generate(user_input, npc_tags)
+            
+            return jsonify({
+                'success': True,
+                'luaScript': lua_script,
+                'model': config.get('model', 'gpt-4.1'),
+                'agentMode': config.get('agentMode', 'standard'),
+                'mode': 'encounter',
+                'knowledgeBase': 'gameplay'  # 标识使用的知识库
+            })
+        else:
+            # 地图生成模式（默认）- 使用地图知识库（KnowledgeBase）
+            # 创建Agentic RAG系统（使用地图知识库，向量数据库：chroma_db）
+            rag_system = AgenticRAGSystem(config)
+            print(f"[INFO] 地图知识库已使用，包含 {len(kb.functions)} 个API函数")
+            
+            # 生成LUA脚本
+            lua_script = rag_system.generate(user_input)
+            
+            return jsonify({
+                'success': True,
+                'luaScript': lua_script,
+                'model': config.get('model', 'gpt-4.1'),
+                'agentMode': config.get('agentMode', 'standard'),
+                'mode': 'map',
+                'knowledgeBase': 'map'  # 标识使用的知识库
+            })
         
     except Exception as e:
         return jsonify({

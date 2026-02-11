@@ -36,17 +36,24 @@ echo     OK
 echo.
 
 REM 检查知识库
-echo [3/4] Checking knowledge base...
+echo [3/5] Checking knowledge base...
 if exist "%BACKEND_DIR%\chroma_db" (
-    echo     Knowledge base initialized
+    echo     Map knowledge base initialized
 ) else (
-    echo     WARNING: Knowledge base not initialized
+    echo     WARNING: Map knowledge base not initialized
     echo     Run: cd backend ^&^& python init_kb.py
+)
+
+if exist "%BACKEND_DIR%\chroma_db_gameplay" (
+    echo     Encounter knowledge base initialized
+) else (
+    echo     WARNING: Encounter knowledge base not initialized
+    echo     Run: cd backend ^&^& python init_gameplay_kb.py
 )
 echo.
 
 REM 快速查找可用端口（简化版本，只检查常用端口）
-echo [4/4] Finding available ports...
+echo [4/5] Finding available ports...
 set "BACKEND_PORT=5000"
 set "FRONTEND_PORT=8080"
 
@@ -75,8 +82,26 @@ echo     Frontend port: %FRONTEND_PORT%
 echo     OK
 echo.
 
+REM 初始化知识库（如果未初始化）
+echo [5/5] Initializing knowledge bases (if needed)...
+if not exist "%BACKEND_DIR%\chroma_db" (
+    echo     Initializing map knowledge base...
+    cd /d "%BACKEND_DIR%"
+    python init_kb.py >nul 2>&1
+    cd /d "%SCRIPT_DIR%"
+)
+
+if not exist "%BACKEND_DIR%\chroma_db_gameplay" (
+    echo     Initializing encounter knowledge base...
+    cd /d "%BACKEND_DIR%"
+    python init_gameplay_kb.py >nul 2>&1
+    cd /d "%SCRIPT_DIR%"
+)
+echo     OK
+echo.
+
 REM 启动服务
-echo [5/5] Starting services...
+echo [6/6] Starting services...
 echo.
 
 REM 启动后端（新窗口）
