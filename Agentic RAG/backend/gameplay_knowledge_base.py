@@ -353,12 +353,20 @@ class GameplayKnowledgeBase:
             collection_name = "gameplay_functions"
             try:
                 self.collection = self.vector_db.get_collection(name=collection_name)
-                print(f"已加载现有知识库集合: {collection_name}")
+                # 检查集合中是否有文档
+                count = self.collection.count()
+                if count == 0 and len(self.functions) > 0:
+                    # 如果集合存在但为空，且已加载函数，则重新索引
+                    print(f"集合 {collection_name} 存在但为空，重新索引...")
+                    self._index_functions()
+                else:
+                    print(f"已加载现有知识库集合: {collection_name}，包含 {count} 个文档")
             except:
                 self.collection = self.vector_db.create_collection(name=collection_name)
                 print(f"创建新知识库集合: {collection_name}")
                 # 索引函数文档
-                self._index_functions()
+                if len(self.functions) > 0:
+                    self._index_functions()
             
             # 初始化嵌入模型
             if EMBEDDING_AVAILABLE:

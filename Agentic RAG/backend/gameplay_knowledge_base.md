@@ -1,452 +1,805 @@
-﻿# Lua 原子模块全量 API 文档（CineText + Narrative）
+Encounter Gameplay Knowledge Base（Atomic Action Modules | RAG Chunk Format）
+0. 通用数据结构约定（Common Data Types）
 
-更新目标：
-1. 列出当前代码里注册到 Lua 的全部 API（不是节选）。
-2. 给出每个 API 的输入、返回和调用示例。
-3. 增加 `Doc/datatable` 表格分析，并标注代码使用与返回结果。
+FVector：{X=0,Y=0,Z=0}
 
-代码基准：
-- `Plugins/CineText/Source/CineText/Private/Event/CineTextEventLibRegister.cpp`
-- `Source/AIGame/Private/Narrative/Core/Narrative*Register.cpp`
-- `Source/AIGame/Public/Narrative/**/*.h`
-- `Source/AIGame/Public/WorldEnvironment/EnvWorldBlueprintLibrary.h`
-- `Source/AIGame/Private/Narrative/World/NarrativeWorldLibrary.cpp`
-- `Source/AIGame/Private/Narrative/Interfaces/NarrativePerformerInterface.cpp`
+FRotator：{Pitch=0,Yaw=0,Roll=0}
 
-## 1. 通用约定
+Actor：从 World.GetByID() 或 Spawn API 获取的对象
 
-| 项 | 约定 |
-|---|---|
-| `FVector` | `{X=0,Y=0,Z=0}` |
-| `FRotator` | `{Pitch=0,Yaw=0,Roll=0}` |
-| `FIntPoint` | `{X=0,Y=0}` |
-| `TArray<T>` | Lua 数组（1 开始） |
-| `TMap<K,V>` | Lua 字典表 |
-| 同步 API | 直接返回 C++ 返回值 |
-| 异步 API | 协程 `yield`，由 `UCineTextLatentHandle:Finish*` 恢复并返回 |
+Actor[]：Lua 数组（1 开始）
 
-异步恢复值：
-- `Finish()` -> `nil`
-- `FinishWithString(s)` -> `string`
-- `FinishWithInt(i)` -> `number`
-- `FinishWithBool(b)` -> `boolean`
+TMap：Lua table 字典
 
-## 2. CineText 全量 API
+A. World 模块（核心玩法 API）
+A1. 获取对象（Player / NPC）
 
-### 2.1 `Event`（全局表）【预留程序实现，没有效果时装】
+World.GetByID(uid) -> Actor|nil
+说明：通过 ID 获取 Actor，例如 Player 或 Tag_A NPC。
+参数：
 
-- `Event.On(eventName, callback)` -> `nil`
-示例：`Event.On("NPCDeath", function(npc,killer) Log(npc,killer) end)`
-- `Event.Once(eventName, callback)` -> `nil`
-示例：`Event.Once("QuestComplete", function(id) Log("done", id) end)`
-- `Event.Off(eventName, callback)` -> `nil`
-示例：`Event.Off("NPCDeath", myCb)`
-- `Event.Clear(eventName)` -> `nil`
-示例：`Event.Clear("NPCDeath")`
+uid：string，例如 "Player"、"Tag_A"、"Tag_B"
 
-说明：回调返回 `true` 会触发执行器中断全部脚本（AbortAllScripts）。
+示例：
 
-## 3. Narrative 全量 API
-
-### 3.1 `System`（全局表）
-
-- `System.Exit()` -> `nil`
-示例：`System.Exit()`
-- `System.ExitAll()` -> `nil`
-示例：`System.ExitAll()`
-- `System.Restart()` -> `nil`（协程挂起并重启请求）
-示例：`System.Restart()`
-- `System.Pause()` -> `nil`（协程挂起）
-示例：`System.Pause()`
-- `System.Resume()` -> `nil`
-示例：`System.Resume()`
-- `System.IsRunning()` -> `bool`
-示例：`if System.IsRunning() then Log("running") end`
-
-### 3.2 `World`（全局表）
-
-
-- `World.SpawnNPC(type, name, loc)` -> `Actor`
-示例：`local n = World.SpawnNPC("Default", "npc_01", {X=100,Y=0,Z=0})`
-- `World.SpawnEnemy(id, loc, count)` -> `Actor[]`
-示例：`local es = World.SpawnEnemy("Spider_Minion_1", {X=300,Y=0,Z=0}, 3)`
-- `World.SpawnEnemyAtPlayer(id, count)` -> `Actor[]`
-示例：`local es = World.SpawnEnemyAtPlayer("Spider_Minion_1", 2)`
-- `World.SpawnTrigger(loc, type, range, code)` -> `Actor`
-示例：`local t = World.SpawnTrigger({X=0,Y=0,Z=0}, "EnterVolume", 300, "Log('hit')")`
-- `World.SpawnEncounter(loc, range, npcData, luaType, code)` -> `Actor|nil`（当前实现返回 `nil`）
-示例：`World.SpawnEncounter({X=0,Y=0,Z=0}, 400, {npc_a="Default"}, "EnterVolume", "Log('enc')")`
-- `World.DestroyByID(uid)` -> `nil`
-示例：`World.DestroyByID("enc01_smith")`
-- `World.Destroy(obj)` -> `nil`
-示例：`World.Destroy(target)`
-- `World.GetByID(uid)` -> `Actor|nil`
-示例：`local p = World.GetByID("Player")`
-- `World.Find(type, center, radius)` -> `Actor[]`
-示例：`local list = World.Find("Enemy", {X=0,Y=0,Z=0}, 1000)`
-- `World.FindNearest(type, pos)` -> `Actor|nil`
-示例：`local e = World.FindNearest("Enemy", {X=0,Y=0,Z=0})`
-- `World.GetAll(type)` -> `Actor[]`
-示例：`local allNpc = World.GetAll("NPC")`
-- `World.PlayFX(id, loc)` -> `nil`
-示例：`World.PlayFX("FX_Explosion", {X=0,Y=0,Z=0})`
-- `World.PlaySound(id, loc)` -> `nil`
-示例：`World.PlaySound("SFX_Hit", {X=0,Y=0,Z=0})`
-- `World.PlaySound2D(id)` -> `AudioObject|nil`
-示例：`local audio = World.PlaySound2D("BGM_1")`
-- `World.StopSound(audioObj)` -> `nil`
-示例：`World.StopSound(audio)`
-- `World.SetTime(hour)` -> `nil`
-示例：`World.SetTime(18.5)`
-- `World.SetWeather(type)` -> `nil`
-示例：`World.SetWeather("Rain")`
-- `World.Wait(seconds)` -> `nil`（异步）
-示例：`World.Wait(1.2)`
-- `World.StartGame()` -> `nil`
-示例：`World.StartGame()`
-
-### 3.3 `UI`（全局表，已注册的 Lua API）
-
-- `UI.Toast(text)` -> `nil`（异步）
-示例：`UI.Toast("任务开始")`
-- `UI.FadeOut(duration)` -> `nil`（异步）
-示例：`UI.FadeOut(0.5)`
-- `UI.FadeIn(duration)` -> `nil`（异步）
-示例：`UI.FadeIn(0.5)`
-- `UI.AskMany(title, options)` -> `any`（异步，取决于蓝图 `FinishWithX`）
-示例：`local r = UI.AskMany("选择", {"A","B","C"})`
-- `UI.ShowDialogue(name, text)` -> `nil|any`（异步）
-示例：`UI.ShowDialogue("铁匠", "欢迎")`
-- `UI.PlayMiniGame(gameType, lv)` -> `string|any`（异步）
-示例：`local r = UI.PlayMiniGame("TTT", 2)`
-- `UI.Ask(msg, btnA, btnB)` -> `bool|string|any`（异步，取决于蓝图）
-示例：`local r = UI.Ask("接受吗?", "是", "否")`
-
-说明：`UNarrativeUILibrary::HideAllUI/RestoreAllUI` 目前存在 C++ API，但未在 `NarrativeUIRegister` 注册到 Lua。
-
-### 3.4 `Time`（全局表）
-
-- `Time.GetInfo()` -> `table`
-示例：`local t = Time.GetInfo()`
-- `Time.GetDay()` -> `int`
-示例：`local d = Time.GetDay()`
-- `Time.GetHour()` -> `int`
-示例：`local h = Time.GetHour()`
-- `Time.GetMinute()` -> `int`
-示例：`local m = Time.GetMinute()`
-- `Time.GetTimeString()` -> `string`
-示例：`Log(Time.GetTimeString())`
-- `Time.IsNight()` -> `bool`
-示例：`if Time.IsNight() then ... end`
-- `Time.SetScale(scale)` -> `nil`
-示例：`Time.SetScale(2.0)`
-- `Time.GetScale()` -> `number`
-示例：`local s = Time.GetScale()`
-- `Time.SetHour(hour)` -> `nil`
-示例：`Time.SetHour(9)`
-- `Time.SetDay(day)` -> `nil`
-示例：`Time.SetDay(3)`
-- `Time.Pause()` -> `nil`
-示例：`Time.Pause()`
-- `Time.Resume()` -> `nil`
-示例：`Time.Resume()`
-- `Time.Reset()` -> `nil`
-示例：`Time.Reset()`
-- `Time.AddOnceSchedule(day, hour, script)` -> `int(eventId)`
-示例：`local id = Time.AddOnceSchedule(2, 20, "Log('night')")`
-- `Time.AddDailySchedule(hour, script)` -> `int(eventId)`
-示例：`local id = Time.AddDailySchedule(6, "Log('morning')")`
-- `Time.RemoveSchedule(eventId)` -> `bool`
-示例：`local ok = Time.RemoveSchedule(id)`
-- `Time.ClearAllSchedules()` -> `nil`
-示例：`Time.ClearAllSchedules()`
-
-### 3.5 `Entity` 接口（`obj:Method(...)`）
-
-- `obj:IsValid()` -> `bool`
-示例：`if obj:IsValid() then ... end`
-- `obj:SetVisible(show)` -> `nil`
-示例：`obj:SetVisible(false)`
-- `obj:SetCollision(enable)` -> `nil`
-示例：`obj:SetCollision(true)`
-- `obj:Destroy()` -> `nil`
-示例：`obj:Destroy()`
-- `obj:GetPos()` -> `FVector`
-示例：`local p = obj:GetPos()`
-- `obj:GetRot()` -> `FRotator`
-示例：`local r = obj:GetRot()`
-- `obj:Teleport(loc, rot)` -> `nil`
-示例：`obj:Teleport({X=0,Y=0,Z=0},{Pitch=0,Yaw=90,Roll=0})`
-- `obj:AttachTo(parent, socket)` -> `nil`
-示例：`obj:AttachTo(player, "hand_r")`
-- `obj:Detach()` -> `nil`
-示例：`obj:Detach()`
-- `obj:AddTag(tag)` -> `nil`
-示例：`obj:AddTag("Quest")`
-- `obj:RemoveTag(tag)` -> `nil`
-示例：`obj:RemoveTag("Quest")`
-- `obj:HasTag(tag)` -> `bool`
-示例：`local ok = obj:HasTag("Quest")`
-- `obj:AddTrigger(type, range, code, once)` -> `nil`
-示例：`obj:AddTrigger("Enter", 300, "Log('enter')", true)`
-
-### 3.6 `Performer` 接口（`npc:Method(...)`）
-
-- `npc:MoveTo(loc)` -> `string`（异步，常见 `Success/Fail`）
-示例：`local r = npc:MoveTo({X=100,Y=0,Z=0})`
-- `npc:MoveToActor(target)` -> `string`（异步）
-示例：`local r = npc:MoveToActor(player)`
-- `npc:Follow(target, dist)` -> `nil`
-示例：`npc:Follow(player, 180)`
-- `npc:StopFollow()` -> `nil`
-示例：`npc:StopFollow()`
-- `npc:LookAt(target)` -> `nil`
-示例：`npc:LookAt(player)`
-- `npc:PlayAnim(animName)` -> `nil`（异步）
-示例：`npc:PlayAnim("Wave")`
-- `npc:PlayAnimLoop(animName, time)` -> `nil`
-示例：`npc:PlayAnimLoop("IdleTalk", 3.0)`
-- `npc:ApproachAndSay(target, text)` -> `nil`（异步）
-示例：`npc:ApproachAndSay(player, "你好")`
-- `npc:SetAsHostile()` -> `string`（异步，缺组件时返回 `Victory`）
-示例：`local r = npc:SetAsHostile()`
-- `npc:SetAsAlly()` -> `nil`
-示例：`npc:SetAsAlly()`
-- `npc:GiveItem(id, count)` -> `nil`
-示例：`npc:GiveItem("Money", 1)`
-- `npc:GiveEquip(id, count)` -> `nil`
-示例：`npc:GiveEquip("Helmet", 1)`
-- `npc:GiveWeapon(id, count)` -> `nil`
-示例：`npc:GiveWeapon("Sword", 1)`
-
-
-### 3.7 `Math`（全量）
-
-#### 随机
-- `Math.RandInt(min,max) -> int`；示例：`local v=Math.RandInt(1,10)`
-- `Math.RandFloat(min,max) -> number`；示例：`local v=Math.RandFloat(0,1)`
-- `Math.Chance(p) -> bool`；示例：`if Math.Chance(0.3) then ... end`
-- `Math.RandDir() -> FVector`；示例：`local d=Math.RandDir()`
-- `Math.RandDir2D() -> FVector`；示例：`local d=Math.RandDir2D()`
-- `Math.RandPointInSphere(center,radius) -> FVector`；示例：`local p=Math.RandPointInSphere({X=0,Y=0,Z=0},300)`
-- `Math.RandPointOnSphere(center,radius) -> FVector`；示例：`local p=Math.RandPointOnSphere({X=0,Y=0,Z=0},300)`
-- `Math.RandPointInRing(center,inner,outer) -> FVector`；示例：`local p=Math.RandPointInRing({X=0,Y=0,Z=0},100,300)`
-- `Math.GaussianRand(mean,stddev) -> number`；示例：`local g=Math.GaussianRand(0,1)`
-
-#### 基础工具
-- `Math.Clamp(v,min,max) -> number`；示例：`local c=Math.Clamp(12,0,10)`
-- `Math.Remap(v,inMin,inMax,outMin,outMax) -> number`；示例：`local x=Math.Remap(0.5,0,1,0,100)`
-- `Math.RemapClamped(v,inMin,inMax,outMin,outMax) -> number`；示例：`local x=Math.RemapClamped(2,0,1,0,100)`
-- `Math.Snap(v,grid) -> number`；示例：`local s=Math.Snap(1.34,0.5)`
-- `Math.SnapVec(v,grid) -> FVector`；示例：`local s=Math.SnapVec({X=12,Y=9,Z=1},10)`
-- `Math.Wrap(v,min,max) -> number`；示例：`local w=Math.Wrap(370,0,360)`
-- `Math.Sign(v) -> int`；示例：`local s=Math.Sign(-2)`
-- `Math.Abs(v) -> number`；示例：`local a=Math.Abs(-9)`
-- `Math.Floor(v) -> int`；示例：`local i=Math.Floor(1.9)`
-- `Math.Ceil(v) -> int`；示例：`local i=Math.Ceil(1.1)`
-- `Math.Round(v) -> int`；示例：`local i=Math.Round(1.6)`
-- `Math.Frac(v) -> number`；示例：`local f=Math.Frac(3.14)`
-- `Math.Min(a,b) -> number`；示例：`local m=Math.Min(1,2)`
-- `Math.Max(a,b) -> number`；示例：`local m=Math.Max(1,2)`
-- `Math.MinInt(a,b) -> int`；示例：`local m=Math.MinInt(1,2)`
-- `Math.MaxInt(a,b) -> int`；示例：`local m=Math.MaxInt(1,2)`
-
-#### 向量与角度
-- `Math.Dist(a,b) -> number`；示例：`local d=Math.Dist(p1,p2)`
-- `Math.Dist2D(a,b) -> number`；示例：`local d=Math.Dist2D(p1,p2)`
-- `Math.Dir(from,to) -> FVector`；示例：`local d=Math.Dir(p1,p2)`
-- `Math.Dot(a,b) -> number`；示例：`local d=Math.Dot(v1,v2)`
-- `Math.Cross(a,b) -> FVector`；示例：`local c=Math.Cross(v1,v2)`
-- `Math.Normalize(v) -> FVector`；示例：`local n=Math.Normalize(v)`
-- `Math.Length(v) -> number`；示例：`local l=Math.Length(v)`
-- `Math.Length2D(v) -> number`；示例：`local l=Math.Length2D(v)`
-- `Math.Reflect(v,n) -> FVector`；示例：`local r=Math.Reflect(v,n)`
-- `Math.Project(v,target) -> FVector`；示例：`local p=Math.Project(v,t)`
-- `Math.ProjectOnPlane(v,normal) -> FVector`；示例：`local p=Math.ProjectOnPlane(v,n)`
-- `Math.DegToRad(deg) -> number`；示例：`local r=Math.DegToRad(90)`
-- `Math.RadToDeg(rad) -> number`；示例：`local d=Math.RadToDeg(3.14)`
-- `Math.NormalizeAngle(a) -> number`；示例：`local a=Math.NormalizeAngle(270)`
-- `Math.ClampAngle(a,min,max) -> number`；示例：`local a=Math.ClampAngle(270,-90,90)`
-
-#### Actor/旋转
-- `Math.GetForward(obj) -> FVector`；示例：`local f=Math.GetForward(actor)`
-- `Math.GetRight(obj) -> FVector`；示例：`local r=Math.GetRight(actor)`
-- `Math.GetUp(obj) -> FVector`；示例：`local u=Math.GetUp(actor)`
-- `Math.GetBounds(obj,bOnlyCol) -> FVector`；示例：`local e=Math.GetBounds(actor,true)`
-- `Math.GetCenter(obj,bOnlyCol) -> FVector`；示例：`local c=Math.GetCenter(actor,true)`
-- `Math.RotFromX(dir) -> FRotator`；示例：`local r=Math.RotFromX({X=1,Y=0,Z=0})`
-- `Math.ForwardFromRot(rot) -> FVector`；示例：`local f=Math.ForwardFromRot({Pitch=0,Yaw=90,Roll=0})`
-- `Math.ToRot(v) -> FRotator`；示例：`local r=Math.ToRot({X=0,Y=1,Z=0})`
-
-#### 几何/插值
-- `Math.IsPointInBox(pt,center,extent) -> bool`；示例：`local ok=Math.IsPointInBox(p,c,e)`
-- `Math.RandPointInBox(center,extent) -> FVector`；示例：`local p=Math.RandPointInBox(c,e)`
-- `Math.GetPointsInCircle(center,radius,count) -> FVector[]`；示例：`local arr=Math.GetPointsInCircle(c,300,8)`
-- `Math.GetPointInCone(origin,dir,angle,dist) -> FVector`；示例：`local p=Math.GetPointInCone(o,d,30,500)`
-- `Math.Lerp(a,b,t) -> number`；示例：`local v=Math.Lerp(0,10,0.3)`
-- `Math.LerpVec(a,b,t) -> FVector`；示例：`local v=Math.LerpVec(v1,v2,0.3)`
-- `Math.LerpRot(a,b,t) -> FRotator`；示例：`local r=Math.LerpRot(r1,r2,0.3)`
-- `Math.EaseIn(t,exp) -> number`；示例：`local v=Math.EaseIn(0.5,2)`
-- `Math.EaseOut(t,exp) -> number`；示例：`local v=Math.EaseOut(0.5,2)`
-- `Math.EaseInOut(t,exp) -> number`；示例：`local v=Math.EaseInOut(0.5,2)`
-- `Math.InterpTo(cur,target,dt,speed) -> number`；示例：`x=Math.InterpTo(x,10,dt,5)`
-- `Math.InterpToVec(cur,target,dt,speed) -> FVector`；示例：`p=Math.InterpToVec(p,tp,dt,5)`
-
-#### 样条/轨迹
-- `Math.GetSplinePoint(points,t) -> FVector`；示例：`local p=Math.GetSplinePoint(ps,0.5)`
-- `Math.GetSplineTangent(points,t) -> FVector`；示例：`local t=Math.GetSplineTangent(ps,0.5)`
-- `Math.GetSplineLength(points) -> number`；示例：`local l=Math.GetSplineLength(ps)`
-- `Math.GetSplinePoints(points,count) -> FVector[]`；示例：`local arr=Math.GetSplinePoints(ps,20)`
-- `Math.GetSplinePointAtDist(points,dist) -> FVector`；示例：`local p=Math.GetSplinePointAtDist(ps,200)`
-- `Math.GetArcPoint(start,end,height,t) -> FVector`；示例：`local p=Math.GetArcPoint(a,b,100,0.5)`
-- `Math.GetArcPoints(start,end,height,count) -> FVector[]`；示例：`local arr=Math.GetArcPoints(a,b,100,16)`
-- `Math.GetClosestPointOnSpline(points,pos) -> FVector`；示例：`local p=Math.GetClosestPointOnSpline(ps,pos)`
-- `Math.GetClosestTOnSpline(points,pos) -> number`；示例：`local t=Math.GetClosestTOnSpline(ps,pos)`
-
-#### 碰撞/噪声
-- `Math.IsPointInSphere(pt,center,radius) -> bool`；示例：`local ok=Math.IsPointInSphere(p,c,100)`
-- `Math.IsPointInCapsule(pt,start,end,radius) -> bool`；示例：`local ok=Math.IsPointInCapsule(p,a,b,50)`
-- `Math.IsPointInCone(pt,origin,dir,length,angle) -> bool`；示例：`local ok=Math.IsPointInCone(p,o,d,500,30)`
-- `Math.ClosestPointOnLine(pt,a,b) -> FVector`；示例：`local p=Math.ClosestPointOnLine(p0,a,b)`
-- `Math.ClosestPointOnBox(pt,center,extent) -> FVector`；示例：`local p=Math.ClosestPointOnBox(p0,c,e)`
-- `Math.LineIntersect2D(a1,a2,b1,b2) -> FVector`；示例：`local p=Math.LineIntersect2D(a1,a2,b1,b2)`
-- `Math.BoxesOverlap(ca,ea,cb,eb) -> bool`；示例：`local ok=Math.BoxesOverlap(ca,ea,cb,eb)`
-- `Math.PerlinNoise1D(x) -> number`；示例：`local n=Math.PerlinNoise1D(0.3)`
-- `Math.PerlinNoise2D(x,y) -> number`；示例：`local n=Math.PerlinNoise2D(0.3,0.7)`
-- `Math.PerlinNoise3D(x,y,z) -> number`；示例：`local n=Math.PerlinNoise3D(0.3,0.7,1.2)`
-
-### 3.8 `Env`（全量）
-
-#### Map/Terrain
-- `Env.CreateMap(w,h,cellSize) -> MapHandle`；示例：`local map=Env.CreateMap(64,64,200)`
-- `Env.SetMapName(map,name) -> nil`；示例：`Env.SetMapName(map,"Demo")`
-- `Env.SetMapTheme(map,theme) -> nil`；示例：`Env.SetMapTheme(map,"Village")`
-- `Env.SetTerrainHeight(map,x,y,h) -> nil`；示例：`Env.SetTerrainHeight(map,10,10,120)`
-- `Env.SetTerrainHeightBatch(map,pts) -> nil`；示例：`Env.SetTerrainHeightBatch(map,{{X=1,Y=1,H=50}})`
-- `Env.LowerTerrain(map,c,r,d,f) -> nil`；示例：`Env.LowerTerrain(map,{X=20,Y=20},5,30,1)`
-- `Env.RaiseTerrain(map,c,r,h,f) -> nil`；示例：`Env.RaiseTerrain(map,{X=20,Y=20},5,30,1)`
-- `Env.FlattenTerrain(map,c,r,h) -> nil`；示例：`Env.FlattenTerrain(map,{X=20,Y=20},8,100)`
-- `Env.SmoothTerrain(map,iter) -> nil`；示例：`Env.SmoothTerrain(map,2)`
-- `Env.PaintTerrain(map,x,y,r,mat) -> nil`；示例：`Env.PaintTerrain(map,10,10,4,"Grass")`
-- `Env.GetTerrainHeight(map,x,y) -> number`；示例：`local h=Env.GetTerrainHeight(map,10,10)`
-- `Env.GetMapSize(map) -> FIntPoint`；示例：`local s=Env.GetMapSize(map)`
-- `Env.GridToWorld(map,x,y) -> FVector`；示例：`local p=Env.GridToWorld(map,10,10)`
-- `Env.WorldToGrid(map,loc) -> FIntPoint`；示例：`local g=Env.WorldToGrid(map,{X=0,Y=0,Z=0})`
-
-#### Block
-- `Env.AddBlock(map,name,pos,size) -> BlockHandle`；示例：`local b=Env.AddBlock(map,"B1",{X=5,Y=5},{X=10,Y=10})`
-- `Env.SetBlockType(block,type) -> nil`；示例：`Env.SetBlockType(b,"Town")`
-- `Env.SetBlockProperty(block,key,val) -> nil`；示例：`Env.SetBlockProperty(b,"Owner","NPC_A")`
-- `Env.GetBlockByName(map,name) -> BlockHandle`；示例：`local b=Env.GetBlockByName(map,"B1")`
-- `Env.GetAllBlocks(map) -> BlockHandle[]`；示例：`local arr=Env.GetAllBlocks(map)`
-- `Env.GetBlockBounds(block) -> FIntRect`；示例：`local r=Env.GetBlockBounds(b)`
-- `Env.GetBlockCenter(block) -> FIntPoint`；示例：`local c=Env.GetBlockCenter(b)`
-- `Env.GetBlockSize(block) -> FIntPoint`；示例：`local s=Env.GetBlockSize(b)`
-- `Env.GetBlockPos(block) -> FIntPoint`；示例：`local p=Env.GetBlockPos(b)`
-- `Env.GetBuildingsInBlock(block) -> BuildingHandle[]`；示例：`local bs=Env.GetBuildingsInBlock(b)`
-- `Env.GetBlockWorldBounds(map,block) -> FBox`；示例：`local wb=Env.GetBlockWorldBounds(map,b)`
-- `Env.IsPointInBlock(block,pos) -> bool`；示例：`local ok=Env.IsPointInBlock(b,{X=7,Y=7})`
-- `Env.BlockGridToWorld(map,block,x,y) -> FVector`；示例：`local p=Env.BlockGridToWorld(map,b,2,2)`
-- `Env.ResizeBlock(block,newSize) -> bool`；示例：`local ok=Env.ResizeBlock(b,{X=12,Y=12})`
-- `Env.SetBlockRotation(block,yawDeg) -> bool`；示例：`local ok=Env.SetBlockRotation(b,90)`
-- `Env.MoveBlockTo(block,newPos) -> bool`；示例：`local ok=Env.MoveBlockTo(b,{X=20,Y=20})`
-- `Env.ClearBlockContent(block,mode) -> bool`；示例：`local ok=Env.ClearBlockContent(b,0)`
-- `Env.DestroyBlock(block) -> bool`；示例：`local ok=Env.DestroyBlock(b)`
-
-#### Building/Prop/Spawn
-- `Env.AddBuilding(block,pos,size,style,rot) -> BuildingHandle`；示例：`local bd=Env.AddBuilding(b,{X=1,Y=1},{X=3,Y=3},"Wood",{Pitch=0,Yaw=0,Roll=0})`
-- `Env.GetBuildingSize(building) -> FIntPoint`；示例：`local s=Env.GetBuildingSize(bd)`
-- `Env.GetBuildingRotation(building) -> number`；示例：`local y=Env.GetBuildingRotation(bd)`
-- `Env.GetBuildingPos(building) -> FIntPoint`；示例：`local p=Env.GetBuildingPos(bd)`
-- `Env.GetBuildingCenter(building) -> FIntPoint`；示例：`local c=Env.GetBuildingCenter(bd)`
-- `Env.GetBuildingBounds(building) -> FIntRect/FEnvIntRect`；示例：`local r=Env.GetBuildingBounds(bd)`
-- `Env.GetBuildingWorldBounds(building) -> FBox`；示例：`local wb=Env.GetBuildingWorldBounds(bd)`
-- `Env.SetBuildingType(building,type) -> nil`；示例：`Env.SetBuildingType(bd,"Shop")`
-- `Env.AddBuildingFloor(building,h) -> int`；示例：`local idx=Env.AddBuildingFloor(bd,300)`
-- `Env.SetBuildingRoof(building,type) -> nil`；示例：`Env.SetBuildingRoof(bd,"Gable")`
-- `Env.AddProp(block,id,localPos,rot) -> nil`；示例：`Env.AddProp(b,"Prop_Tent",{X=100,Y=0,Z=0},{Pitch=0,Yaw=0,Roll=0})`
-- `Env.AddNPCSpawn(block,id,localPos,rot) -> nil`；示例：`Env.AddNPCSpawn(b,"Default",{X=0,Y=0,Z=0},{Pitch=0,Yaw=0,Roll=0})`
-- `Env.AddEnemySpawn(block,id,localPos,radius) -> nil`；示例：`Env.AddEnemySpawn(b,"Spider_Minion_1",{X=0,Y=0,Z=0},300)`
-- `Env.AddInteractable(block,type,pos,script) -> nil`；示例：`Env.AddInteractable(b,"Chest",{X=0,Y=0,Z=0},"Log('open')")`
-- `Env.AddTriggerZone(block,pos,size,type,script) -> nil`；示例：`Env.AddTriggerZone(b,{X=0,Y=0,Z=0},{X=200,Y=200,Z=100},"Enter","Log('in')")`
-- `Env.AddSpawnPoint(block,tag,pos) -> nil`；示例：`Env.AddSpawnPoint(b,"PlayerStart",{X=0,Y=0,Z=0})`
-- `Env.FindEmptySpace(block,size2D) -> FVector`；示例：`local p=Env.FindEmptySpace(b,{X=200,Y=200})`
-- `Env.IsSpaceEmpty(block,pos,size2D) -> bool`；示例：`local ok=Env.IsSpaceEmpty(b,{X=0,Y=0,Z=0},{X=200,Y=200})`
-- `Env.ResizeBuilding(building,newSize) -> bool`；示例：`local ok=Env.ResizeBuilding(bd,{X=4,Y=4})`
-- `Env.SetBuildingRotation(building,yawDeg) -> bool`；示例：`local ok=Env.SetBuildingRotation(bd,45)`
-- `Env.MoveBuildingTo(building,newPos) -> bool`；示例：`local ok=Env.MoveBuildingTo(bd,{X=3,Y=3})`
-- `Env.DestroyBuilding(building) -> bool`；示例：`local ok=Env.DestroyBuilding(bd)`
-- `Env.MovePropTo(prop,newPos) -> bool`；示例：`local ok=Env.MovePropTo(prop,{X=2,Y=2})`
-- `Env.DestroyProp(prop) -> bool`；示例：`local ok=Env.DestroyProp(prop)`
-
-#### Connection/Auto/Generation/SaveBuild
-- `Env.AddRoad(map,a,b,width,roadType) -> ConnectionHandle`；示例：`local c=Env.AddRoad(map,b1,b2,4,"Dirt")`
-- `Env.AddBridge(map,a,b,width) -> ConnectionHandle`；示例：`local c=Env.AddBridge(map,b1,b2,3)`
-- `Env.AddTeleport(map,a,posA,b,posB) -> ConnectionHandle`；示例：`local c=Env.AddTeleport(map,b1,{X=0,Y=0,Z=0},b2,{X=0,Y=0,Z=0})`
-- `Env.AddStairs(map,a,b,width) -> ConnectionHandle`；示例：`local c=Env.AddStairs(map,b1,b2,2)`
-- `Env.SetConnectionProperty(conn,key,val) -> nil`；示例：`Env.SetConnectionProperty(c,"Cost","5")`
-- `Env.GetConnections(map,block) -> ConnectionHandle[]`；示例：`local arr=Env.GetConnections(map,b1)`
-- `Env.AreBlocksConnected(map,a,b) -> bool`；示例：`local ok=Env.AreBlocksConnected(map,b1,b2)`
-- `Env.AutoGenerateRoads(map) -> nil`；示例：`Env.AutoGenerateRoads(map)`
-- `Env.GenMapFromTemplate(template,seed) -> MapHandle`；示例：`local m=Env.GenMapFromTemplate("VillageA",123)`
-- `Env.GenDungeonBlock(map,pos,size,seed) -> BlockHandle`；示例：`local b=Env.GenDungeonBlock(map,{X=0,Y=0},{X=20,Y=20},1)`
-- `Env.GenVillageBlock(map,pos,size,bldgs,seed) -> BlockHandle`；示例：`local b=Env.GenVillageBlock(map,{X=0,Y=0},{X=20,Y=20},8,1)`
-- `Env.GenForestBlock(map,pos,size,density,seed) -> BlockHandle`；示例：`local b=Env.GenForestBlock(map,{X=0,Y=0},{X=20,Y=20},0.7,1)`
-- `Env.GenMountainRange(map,start,end,height,width) -> nil`；示例：`Env.GenMountainRange(map,{X=0,Y=0},{X=20,Y=20},200,3)`
-- `Env.SaveMap(map,slot) -> bool`；示例：`local ok=Env.SaveMap(map,"slot_1")`
-- `Env.LoadMap(slot) -> MapHandle`；示例：`local map=Env.LoadMap("slot_1")`
-- `Env.ValidateMap(map) -> string[]`；示例：`local errs=Env.ValidateMap(map)`
-- `Env.Build(map) -> Actor(LevelRoot)`；示例：`local root=Env.Build(map)`
-- `Env.BuildAsync(map) -> Actor|nil`（异步）
-示例：`local root=Env.BuildAsync(map)`
-
-## 4. `Doc/datatable` 表格分析（按代码使用）
-
-### 4.1 每张表的代码使用关系
-
-| 表名 | 主要行键示例 | 代码读取位置 | 关联 API | 返回结果 |
-|---|---|---|---|---|
-| `DT_SpawnNPCTable.csv` | `Default`, `BaseNPC` | `NarrativeWorldLibrary.cpp` `FindRow<FNarrativeSpawnRow>` | `World.SpawnNPC`, `World.SpawnEncounter` | `ActorClass` -> 生成 `AActor*` |
-| `DT_EnemyDataTable.csv` | `Spider_Minion_1` 等 | `NarrativeWorldLibrary.cpp` `FindRow<FEnemyData>` | `World.SpawnEnemy`, `World.SpawnEnemyAtPlayer` | `EnemyClass` -> `AEnemyBase*[]` |
-| `DT_Items.csv` | `TestSword`, `Money`, `Helmet` 等 | `NarrativePerformerInterface.cpp`（通过 `itemRowName` + `ItemReInit`） | `npc:GiveItem/GiveEquip/GiveWeapon` | 生成道具 Actor，函数本身 `nil` |
-| `DT_EquipmentDataTable.csv` | `Helmet`, `WindRing`, `HeavyShackle` | 由物品系统/装备系统间接读取 | 间接（由 `DT_Items` 的装备项驱动） | 装备词条与显示数据 |
-| `DT_WeaponDataTable.csv` | `TestSword`, `Spear`, `FireSword` | 战斗组件/武器链路读取 | 间接（武器装备后） | 攻击链、范围、技能等 |
-| `DT_AffixDataTable.csv` | `ATK_ADD_10`, `MSPD_ADD_200` 等 | CombatComponent `AddAffixByID` 读取 | 间接（装备/技能触发） | 词条类与描述 |
-| `DT_Equipment.csv` | `TestSword`, `Helmet` 等 | 装备展示系统读取 | 间接（装备外观） | 网格、插槽、处理器 |
-| `PropVilligeData.csv` | `Prop_Tent`, `Prop_Fountain` 等 | 环境/摆件系统（非 Narrative Lua 直接） | 间接（`Env.AddProp` 使用 ID） | Prop 资源与尺寸 |
-
-### 4.2 遇脚本中的“代码调用 -> 表 -> 返回”
-
-| 脚本代码 | 实际表查询 | 返回 |
-|---|---|---|
-| `World.SpawnEncounter(loc, r, npcData, "EnterVolume", code)` | `npcData` 的 value（`Default`）查 `DT_SpawnNPCTable` | 当前函数返回 `nil`（内部会异步生成 NPC + 触发器） |
-| `World.GetByID("enc01_smith")` | 不查表，按 Actor Tag 查找 | `Actor|nil` |
-| `smith:ApproachAndSay(player, text)` | 不查 `Doc/datatable`，是行为接口 | 异步完成，恢复值通常 `nil` |
-| `UI.Toast("你获得了TestSword")` | 不查表（仅显示文本） | 异步，恢复 `nil` |
-
-关键点：你当前 `Doc/lua_encounters/*.lua` 里“获得物品”只是 `UI.Toast` 文本，不会发放物品。要真正发放，需要调用：
-- `smith:GiveWeapon("TestSword",1)`
-- `smith:GiveEquip("Helmet",1)`
-- `smith:GiveItem("Money",1)`
-这些 ID 会走 `DT_Items.csv` 的 row key。
-
-### 4.3 你这批 6 个遇脚本里的表键覆盖
-
-- NPC类型键（用于 `DT_SpawnNPCTable`）：`Default`
-- 文本提及的物品键（在 `DT_Items.csv` 中存在）：
-`TestSword`, `TestSpear`, `Spear`, `Sword`, `FireSword`, `Helmet`, `WindRing`, `HeavyShackle`, `BloodChain`, `Money`
-
-## 5. 组合调用参考（真发奖励）
-
-```lua
 local player = World.GetByID("Player")
-local smith = World.GetByID("enc01_smith")
+local npcA = World.GetByID("Tag_A")
 
-if smith and player then
-    smith:ApproachAndSay(player, "完成试炼，给你装备。")
-    smith:GiveEquip("Helmet", 1)
-    smith:GiveWeapon("TestSword", 1)
-    smith:GiveItem("Money", 1)
-    UI.Toast("已发放：Helmet / TestSword / Money")
+
+推荐用法：
+
+local player = World.GetByID("Player")
+if not player or not player:IsValid() then return end
+
+
+常见错误：
+
+未判空就调用 player:GetPos()
+
+A2. 延迟 / 节奏控制（Wait）
+
+World.Wait(seconds) -> nil（异步）
+说明：暂停脚本执行若干秒，用于节奏控制。
+参数：
+
+seconds：number
+
+示例：
+
+World.Wait(0.8)
+
+
+推荐用法：
+
+npcA:MoveTo(locA)
+World.Wait(1.0)
+npcA:LookAt(player)
+
+
+常见错误：
+
+对话/动作之间没有 Wait，导致剧情刷屏
+
+A3. 播放特效（FX）
+
+World.PlayFX(id, loc) -> nil
+说明：在指定位置播放特效。
+参数：
+
+id：string，FX 资源 ID
+
+loc：FVector
+
+示例：
+
+World.PlayFX("FX_Explosion", {X=0, Y=0, Z=0})
+
+
+推荐用法：
+
+World.PlayFX("FX_Explosion", base)
+World.Wait(0.3)
+
+
+常见错误：
+
+loc 传入 nil
+
+A4. 播放 3D 音效
+
+World.PlaySound(id, loc) -> nil
+说明：在世界坐标播放 3D 音效。
+参数：
+
+id：string
+
+loc：FVector
+
+示例：
+
+World.PlaySound("SFX_Hit", {X=0, Y=0, Z=0})
+
+
+推荐用法：
+
+World.PlaySound("SFX_Hit", base)
+World.Wait(0.2)
+
+A5. 播放 2D 音乐
+
+World.PlaySound2D(id) -> AudioObject|nil
+说明：播放 2D 音频（通常是 BGM），返回音频对象用于停止。
+参数：
+
+id：string
+
+示例：
+
+local audio = World.PlaySound2D("BGM_1")
+
+
+推荐用法：
+
+local bgm = World.PlaySound2D("BGM_1")
+World.Wait(5.0)
+World.StopSound(bgm)
+
+
+常见错误：
+
+没保存 audioObj，导致无法停止
+
+A6. 停止 2D 音频
+
+World.StopSound(audioObj) -> nil
+说明：停止由 PlaySound2D 返回的音频对象。
+参数：
+
+audioObj：AudioObject
+
+示例：
+
+World.StopSound(audio)
+
+A7. 生成敌人（SpawnEnemy）
+
+World.SpawnEnemy(id, loc, count) -> Actor[]
+说明：在指定位置生成敌人。
+参数：
+
+id：string（例如 "Spider_Minion_1"）
+
+loc：FVector
+
+count：int
+
+示例：
+
+local es = World.SpawnEnemy("Spider_Minion_1", {X=300, Y=0, Z=0}, 3)
+
+
+推荐用法：
+
+World.PlaySound("SFX_Hit", base)
+World.PlayFX("FX_Explosion", base)
+World.SpawnEnemy("Spider_Minion_1", {X=base.X + 150, Y=base.Y, Z=base.Z}, 2)
+UI.Toast("敌人出现！")
+
+
+常见错误：
+
+count 写成 0
+
+A8. 在玩家周围生成敌人
+
+World.SpawnEnemyAtPlayer(id, count) -> Actor[]
+说明：在玩家附近生成敌人（自动定位）。
+参数：
+
+id：string
+
+count：int
+
+示例：
+
+local es = World.SpawnEnemyAtPlayer("Spider_Minion_1", 2)
+
+A9. 销毁对象（Destroy Actor）
+
+World.Destroy(obj) -> nil
+说明：销毁一个 Actor。
+参数：
+
+obj：Actor
+
+示例：
+
+World.Destroy(npcA)
+
+A10. 根据 ID 销毁对象
+
+World.DestroyByID(uid) -> nil
+说明：通过 ID 销毁对象。
+参数：
+
+uid：string
+
+示例：
+
+World.DestroyByID("enc01_smith")
+
+B. UI 模块（交互核心）
+B1. Toast（提示文本）
+
+UI.Toast(text) -> nil（异步）
+说明：屏幕弹出提示文本。
+参数：
+
+text：string
+
+示例：
+
+UI.Toast("任务开始")
+
+
+推荐用法：
+
+UI.Toast("你获得了 Money x10")
+World.Wait(0.5)
+
+B2. FadeOut
+
+UI.FadeOut(duration) -> nil（异步）
+说明：画面淡出。
+参数：
+
+duration：number
+
+示例：
+
+UI.FadeOut(0.5)
+
+B3. FadeIn
+
+UI.FadeIn(duration) -> nil（异步）
+说明：画面淡入。
+参数：
+
+duration：number
+
+示例：
+
+UI.FadeIn(0.5)
+
+B4. 显示对白（ShowDialogue）
+
+UI.ShowDialogue(name, text) -> nil|any（异步）
+说明：显示 UI 对话框。
+参数：
+
+name：string
+
+text：string
+
+示例：
+
+UI.ShowDialogue("商人", "你看起来不像本地人。")
+
+
+推荐用法：
+
+UI.ShowDialogue("旅人", "等等！你能帮我一下吗？")
+World.Wait(0.6)
+
+
+常见错误：
+
+连续多句对白无 Wait
+
+B5. 二选一选择（Ask）
+
+UI.Ask(msg, btnA, btnB) -> bool|string|any（异步）
+说明：弹出二选一对话框。返回值依赖蓝图实现，常见为 bool。
+参数：
+
+msg：string
+
+btnA：string
+
+btnB：string
+
+示例：
+
+local ok = UI.Ask("你愿意帮忙吗？", "帮", "不帮")
+
+
+推荐用法：
+
+local ok = UI.Ask("你要插手吗？", "插手", "离开")
+if ok == true then
+    UI.Toast("你决定介入。")
+else
+    UI.Toast("你决定远离麻烦。")
 end
-```
+
+B6. 多选项选择（AskMany）
+
+UI.AskMany(title, options) -> any（异步）
+说明：弹出多选项列表。返回值通常为数字索引（1 开始）。
+参数：
+
+title：string
+
+options：string[]
+
+示例：
+
+local r = UI.AskMany("你打算怎么做？", {"介入", "旁观", "离开"})
+
+
+推荐用法：
+
+local r = UI.AskMany("你打算怎么做？", {"帮他作证", "揭穿他", "不说话"})
+if r == 1 then
+elseif r == 2 then
+else
+end
+
+
+常见错误：
+
+用 r==0 判断（Lua 数组从 1 开始）
+
+B7. 触发小游戏
+
+UI.PlayMiniGame(gameType, lv) -> string|any（异步）
+说明：启动小游戏。返回值依赖蓝图。
+参数：
+
+gameType：string（例如 "TTT"）
+
+lv：int
+
+示例：
+
+local r = UI.PlayMiniGame("TTT", 2)
+
+C. System 模块（脚本控制）
+C1. Exit（退出当前脚本）
+
+System.Exit() -> nil
+说明：退出当前 Encounter 脚本。
+参数：无
+
+示例：
+
+System.Exit()
+
+
+推荐用法：
+
+World.Wait(0.8)
+System.Exit()
+
+
+常见错误：
+
+忘记 Exit 导致脚本不结束
+
+C2. ExitAll
+
+System.ExitAll() -> nil
+说明：退出全部脚本。一般不建议 Encounter 使用。
+参数：无
+
+示例：
+
+System.ExitAll()
+
+D. Entity 通用接口（Actor 基础能力）
+D1. IsValid
+
+obj:IsValid() -> bool
+说明：判断 Actor 是否有效。
+参数：无
+
+示例：
+
+if npcA and npcA:IsValid() then
+end
+
+D2. GetPos
+
+obj:GetPos() -> FVector
+说明：获取 Actor 世界坐标。
+参数：无
+
+示例：
+
+local ppos = player:GetPos()
+
+D3. GetRot
+
+obj:GetRot() -> FRotator
+说明：获取 Actor 世界旋转。
+参数：无
+
+示例：
+
+local rot = npcA:GetRot()
+
+D4. Teleport
+
+obj:Teleport(loc, rot) -> nil
+说明：瞬移 Actor 到指定位置和旋转。
+参数：
+
+loc：FVector
+
+rot：FRotator
+
+示例：
+
+npcA:Teleport({X=0,Y=0,Z=0},{Pitch=0,Yaw=90,Roll=0})
+
+D5. Destroy（对象自毁）
+
+obj:Destroy() -> nil
+说明：Actor 自毁。
+参数：无
+
+示例：
+
+npcA:Destroy()
+
+D6. AddTrigger（给 Actor 添加触发器）
+
+obj:AddTrigger(type, range, code, once) -> nil
+说明：给 Actor 添加触发器事件。
+参数：
+
+type：string
+
+range：number
+
+code：string
+
+once：bool
+
+示例：
+
+npcA:AddTrigger("Enter", 300, "UI.Toast('trigger')", true)
+
+E. Performer（NPC 行为接口）
+E1. MoveTo（移动到坐标）
+
+npc:MoveTo(loc) -> string（异步，常见 Success/Fail）
+说明：让 NPC 移动到目标位置。
+参数：
+
+loc：FVector
+
+示例：
+
+local r = npcA:MoveTo({X=100, Y=0, Z=0})
+
+
+推荐用法：
+
+npcA:MoveTo(locA)
+World.Wait(0.9)
+
+
+常见错误：
+
+MoveTo 后立即对话，没有 Wait
+
+E2. MoveToActor（移动到目标 Actor）
+
+npc:MoveToActor(target) -> string（异步）
+说明：让 NPC 走向目标 Actor。
+参数：
+
+target：Actor
+
+示例：
+
+local r = npcA:MoveToActor(player)
+
+E3. Follow（跟随）
+
+npc:Follow(target, dist) -> nil
+说明：NPC 跟随目标 Actor。
+参数：
+
+target：Actor
+
+dist：number
+
+示例：
+
+npcA:Follow(player, 180)
+
+E4. StopFollow（停止跟随）
+
+npc:StopFollow() -> nil
+说明：停止 Follow。
+参数：无
+
+示例：
+
+npcA:StopFollow()
+
+E5. LookAt（朝向目标）
+
+npc:LookAt(target) -> nil
+说明：NPC 面向目标 Actor。
+参数：
+
+target：Actor
+
+示例：
+
+npcA:LookAt(player)
+
+
+推荐用法：
+
+npcA:MoveTo(locA)
+World.Wait(0.8)
+npcA:LookAt(player)
+
+E6. PlayAnim（播放动画）
+
+npc:PlayAnim(animName) -> nil（异步）
+说明：播放一次动画。
+参数：
+
+animName：string
+
+示例：
+
+npcA:PlayAnim("Wave")
+
+
+推荐用法：
+
+npcA:PlayAnim("Wave")
+World.Wait(0.6)
+
+E7. PlayAnimLoop（循环动画）
+
+npc:PlayAnimLoop(animName, time) -> nil
+说明：循环播放动画一段时间。
+参数：
+
+animName：string
+
+time：number
+
+示例：
+
+npcA:PlayAnimLoop("IdleTalk", 3.0)
+
+E8. ApproachAndSay（靠近并说话）
+
+npc:ApproachAndSay(target, text) -> nil（异步）
+说明：NPC 自动走向目标并说话。
+参数：
+
+target：Actor
+
+text：string
+
+示例：
+
+npcA:ApproachAndSay(player, "等等！你能帮我一下吗？")
+
+
+推荐用法：
+
+npcA:ApproachAndSay(player, "你看起来不像本地人。")
+World.Wait(1.0)
+
+E9. SetAsHostile（敌对化）
+
+npc:SetAsHostile() -> string（异步，缺组件时返回 Victory）
+说明：将 NPC 设置为敌对状态。
+参数：无
+
+示例：
+
+local r = npcA:SetAsHostile()
+
+
+推荐用法：
+
+npcA:SetAsHostile()
+World.Wait(0.4)
+UI.Toast("对方突然翻脸！")
+
+E10. SetAsAlly（盟友化）
+
+npc:SetAsAlly() -> nil
+说明：将 NPC 设置为友方。
+参数：无
+
+示例：
+
+npcA:SetAsAlly()
+
+E11. GiveItem（给予物品）
+
+npc:GiveItem(id, count) -> nil
+说明：给予玩家物品。ID 必须存在于 DT_Items.csv。
+
+gameplay_knowledge_base
+
+
+参数：
+
+id：string（例如 "Money"）
+
+count：int
+
+示例：
+
+npcA:GiveItem("Money", 10)
+
+
+推荐用法：
+
+npcA:GiveItem("Money", 10)
+UI.Toast("你获得了 Money x10")
+
+E12. GiveEquip（给予装备）
+
+npc:GiveEquip(id, count) -> nil
+说明：给予玩家装备。ID 必须存在于 datatable。
+参数：
+
+id：string
+
+count：int
+
+示例：
+
+npcA:GiveEquip("Helmet", 1)
+
+E13. GiveWeapon（给予武器）
+
+npc:GiveWeapon(id, count) -> nil
+说明：给予玩家武器。ID 必须存在于 datatable。
+参数：
+
+id：string
+
+count：int
+
+示例：
+
+npcA:GiveWeapon("TestSword", 1)
+
+F. Time 模块（环境时间控制，可选）
+F1. 获取时间信息
+
+Time.GetInfo() -> table
+说明：获取时间信息 table。
+参数：无
+
+示例：
+
+local t = Time.GetInfo()
+
+F2. 判断夜晚
+
+Time.IsNight() -> bool
+说明：判断是否为夜晚。
+参数：无
+
+示例：
+
+if Time.IsNight() then
+    UI.Toast("夜色更危险。")
+end
+
+G. Math 模块（随机性与涌现关键）
+G1. 随机整数
+
+Math.RandInt(min, max) -> int
+说明：生成随机整数。
+参数：
+
+min：int
+
+max：int
+
+示例：
+
+local v = Math.RandInt(1, 10)
+
+G2. 概率触发
+
+Math.Chance(p) -> bool
+说明：以概率 p 返回 true。
+参数：
+
+p：number（0~1）
+
+示例：
+
+if Math.Chance(0.3) then
+    UI.Toast("突然发生意外！")
+end
+
+G3. 距离计算
+
+Math.Dist(a, b) -> number
+说明：计算两点距离。
+参数：
+
+a：FVector
+
+b：FVector
+
+示例：
+
+local d = Math.Dist(ppos, base)
+
+H. Encounter 完整模板（可直接用于生成）
+H1. 最小可运行 Encounter 模板（1 NPC + 2 分支）
+World.SpawnEncounter(
+    {X=0, Y=0, Z=0},
+    300,
+    {
+        ["Tag_A"] = "NPC_Base"
+    },
+    "EnterVolume",
+    [[
+local player = World.GetByID("Player")
+local npcA = World.GetByID("Tag_A")
+
+if not player or not player:IsValid() then return end
+if not npcA or not npcA:IsValid() then return end
+
+local ppos = player:GetPos()
+local base = {X=ppos.X + 200, Y=ppos.Y, Z=ppos.Z}
+
+npcA:MoveTo(base)
+World.Wait(0.9)
+
+npcA:LookAt(player)
+World.Wait(0.4)
+
+UI.ShowDialogue("陌生人", "你能停一下吗？我需要你帮个忙。")
+World.Wait(0.6)
+
+local r = UI.AskMany("你要怎么回应？", {"帮忙", "拒绝"})
+
+if r == 1 then
+    UI.ShowDialogue("陌生人", "太好了！我就知道你是个可靠的人。")
+    World.Wait(0.5)
+    npcA:GiveItem("Money", 15)
+    UI.Toast("你获得了 Money x15")
+else
+    UI.ShowDialogue("陌生人", "好吧……我不该期待什么。")
+    World.Wait(0.5)
+    UI.Toast("对方失望地离开了。")
+end
+
+World.Wait(0.8)
+
+System.Exit()
+    ]]
+)
+
+I. Encounter 常见拼装套路（RAG Pattern Chunk）
+I1. "冲突升级"套路（Conflict Escalation）
+
+推荐拼装顺序：
+
+NPC MoveTo 站位
+
+NPC LookAt
+
+NPC PlayAnim("Angry")
+
+UI.ShowDialogue 引发矛盾
+
+UI.AskMany 选择
+
+分支：平息 / 升级战斗
+
+SpawnEnemy 或 GiveItem
+
+System.Exit
+
+I2. "随机意外"套路（Emergent Random Event）
+
+推荐写法：
+
+if Math.Chance(0.4) then
+    World.PlaySound("SFX_Hit", base)
+    World.PlayFX("FX_Explosion", base)
+    UI.Toast("一阵骚动突然爆发！")
+end
