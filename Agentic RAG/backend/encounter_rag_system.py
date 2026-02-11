@@ -108,7 +108,7 @@ NPC标签：{npc_list_text}
 3. 玩家介入点（对话/选择/行动）
 4. 至少1个结果分支
 
-请直接输出故事文本，不要包含其他说明。"""
+**输出要求**：只输出故事文本，不要包含"故事："、"背景："等标题，不要包含其他说明文字。"""
         
         story = self._call_llm_api(prompt)
         return story.strip()
@@ -247,14 +247,125 @@ World.SpawnEncounter(
 8. Type固定"EnterVolume"
 9. 代码块必须使用[[ ... ]]
 
-请直接输出完整的World.SpawnEncounter代码，不要包含其他说明。"""
+**输出要求（严格遵循）**：
+- 只输出World.SpawnEncounter代码，不要任何解释、说明、注释或其他文字
+- 不要包含"```lua"或"```"代码块标记
+- 不要包含"优化说明"、"代码说明"、"基于用户需求"等任何说明文字
+- 不要包含"###"、"##"等Markdown标题
+- 直接输出代码，从World.SpawnEncounter开始，到最后一个)结束
+- 输出格式示例：
+World.SpawnEncounter(
+    {{X=0, Y=0, Z=0}},
+    450,
+    {npc_map},
+    "EnterVolume",
+    [[
+        local player = World.GetByID("Player")
+        ...
+        System.Exit()
+    ]]
+)"""
         
         lua_code = self._call_llm_api(prompt)
+        
+        # 提取纯LUA代码（移除可能的说明文字）
+        lua_code = self._extract_lua_code(lua_code)
         
         # 清理代码：移除注释
         lua_code = self._remove_comments(lua_code)
         
         return lua_code.strip()
+    
+    def _extract_lua_code(self, response: str) -> str:
+        """
+        从LLM响应中提取纯LUA代码
+        移除可能的说明文字、代码块标记等
+        """
+        # 移除代码块标记
+        response = response.replace('```lua', '').replace('```', '').strip()
+        
+        # 移除常见的说明文字前缀
+        prefixes_to_remove = [
+            '基于用户需求，',
+            '我们将优化',
+            '优化说明：',
+            '代码说明：',
+            '以下是优化后的代码：',
+            '生成的代码：',
+        ]
+        for prefix in prefixes_to_remove:
+            if response.startswith(prefix):
+                response = response[len(prefix):].strip()
+        
+        # 查找World.SpawnEncounter的开始位置
+        start_marker = 'World.SpawnEncounter'
+        start_idx = response.find(start_marker)
+        
+        if start_idx == -1:
+            # 如果没有找到，返回原响应
+            return response
+        
+        # 从World.SpawnEncounter开始提取
+        code = response[start_idx:]
+        
+        # 查找最后一个)的位置（World.SpawnEncounter的结束）
+        # 需要匹配括号，找到最外层的)
+        paren_count = 0
+        last_paren_idx = -1
+        
+        for i, char in enumerate(code):
+            if char == '(':
+                paren_count += 1
+            elif char == ')':
+                paren_count -= 1
+                if paren_count == 0:
+                    last_paren_idx = i
+                    break
+        
+        if last_paren_idx != -1:
+            code = code[:last_paren_idx + 1]
+        else:
+            # 如果没找到匹配的)，尝试找到最后一个)
+            last_paren_idx = code.rfind(')')
+            if last_paren_idx != -1:
+                code = code[:last_paren_idx + 1]
+        
+        # 移除可能的后续说明文字
+        # 查找常见的说明文字标记
+        stop_markers = [
+            '\n###',
+            '\n##',
+            '\n**优化说明',
+            '\n**代码说明',
+            '\n优化说明',
+            '\n代码说明',
+            '\n注意：',
+            '\n说明：',
+            '\n这个脚本',
+            '\n脚本',
+            '\n基于用户需求',
+            '\n我们将优化',
+            '\n### 优化说明',
+            '\n## 优化说明',
+        ]
+        
+        for marker in stop_markers:
+            marker_idx = code.find(marker)
+            if marker_idx != -1:
+                code = code[:marker_idx]
+                break
+        
+        # 移除末尾可能的空白和换行
+        code = code.rstrip()
+        
+        # 确保以)结尾
+        if not code.endswith(')'):
+            # 查找最后一个)
+            last_paren = code.rfind(')')
+            if last_paren != -1:
+                code = code[:last_paren + 1]
+        
+        return code.strip()
     
     def _remove_comments(self, code: str) -> str:
         """移除Lua代码中的注释"""
@@ -343,9 +454,14 @@ World.SpawnEncounter(
 7. 是否包含System.Exit()
 8. 是否移除了所有注释
 
-请提供优化后的完整World.SpawnEncounter代码。"""
+**输出要求**：
+- 只输出优化后的World.SpawnEncounter代码，不要任何解释、说明或其他文字
+- 不要包含"```lua"或"```"代码块标记
+- 直接输出代码，从World.SpawnEncounter开始，到最后一个)结束"""
         
         refined_code = self._call_llm_api(prompt)
+        # 提取纯LUA代码
+        refined_code = self._extract_lua_code(refined_code)
         refined_code = self._remove_comments(refined_code)
         return refined_code.strip()
     
