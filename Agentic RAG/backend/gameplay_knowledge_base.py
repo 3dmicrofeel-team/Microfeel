@@ -150,13 +150,18 @@ class GameplayKnowledgeBase:
     def __init__(self, knowledge_file: str = "gameplay_knowledge_base.md"):
         """初始化知识库"""
         self.knowledge_file = knowledge_file
+        self.reference_document = "gameplay_document.md"  # 参考文档
         self.functions: List[GameplayFunctionDoc] = []
+        self.reference_examples: str = ""  # 参考文档中的示例代码
         self.vector_db = None
         self.embedding_model = None
         self.collection = None
         
         # 加载知识库文档
         self._load_knowledge_base()
+        
+        # 加载参考文档（gameplay_document.md）
+        self._load_reference_document()
         
         # 初始化向量数据库
         if CHROMADB_AVAILABLE:
@@ -206,6 +211,211 @@ class GameplayKnowledgeBase:
         self._parse_markdown(content)
         
         print(f"已加载 {len(self.functions)} 个奇遇API函数文档")
+    
+    def _load_reference_document(self):
+        """加载参考文档 gameplay_document.md，提取示例代码"""
+        possible_paths = [
+            os.path.join(os.path.dirname(__file__), self.reference_document),
+            os.path.join(os.path.dirname(__file__), "..", self.reference_document),
+            self.reference_document
+        ]
+        
+        doc_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                doc_path = path
+                break
+        
+        if not doc_path or not os.path.exists(doc_path):
+            print(f"警告: 参考文档不存在，尝试的路径: {possible_paths}")
+            return
+        
+        # 读取文件
+        try:
+            with open(doc_path, 'r', encoding='utf-8-sig') as f:
+                content = f.read()
+        except (UnicodeDecodeError, UnicodeError):
+            try:
+                with open(doc_path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+            except:
+                with open(doc_path, 'r', encoding='gbk', errors='replace') as f:
+                    content = f.read()
+        
+        # 移除BOM
+        if content.startswith('\ufeff'):
+            content = content[1:]
+        
+        # 提取关键部分：API示例和组合调用参考
+        self._extract_reference_examples(content)
+        
+        print(f"已加载参考文档: {self.reference_document}")
+    
+    def _extract_reference_examples(self, content: str):
+        """从参考文档中提取示例代码和关键规则"""
+        examples_parts = []
+        
+        # 提取所有示例代码（格式：示例：`code`）
+        example_pattern = r'示例[：:]\s*`([^`]+)`'
+        examples = re.findall(example_pattern, content)
+        
+        # 提取组合调用参考部分（第5节）
+        section_5_match = re.search(r'## 5\.\s*组合调用参考[^\n]*\n(.*?)(?=\n##|\Z)', content, re.DOTALL)
+        if section_5_match:
+            examples_parts.append("## 组合调用参考（来自gameplay_document.md）")
+            examples_parts.append(section_5_match.group(1).strip())
+            examples_parts.append("")
+        
+        # 提取关键API示例（World.SpawnEncounter相关）
+        spawn_encounter_match = re.search(r'World\.SpawnEncounter[^\n]*示例[：:]\s*`([^`]+)`', content)
+        if spawn_encounter_match:
+            examples_parts.append("## World.SpawnEncounter 标准示例")
+            examples_parts.append(f"```lua\n{spawn_encounter_match.group(1)}\n```")
+            examples_parts.append("")
+        
+        # 提取Performer接口的关键示例
+        performer_examples = []
+        performer_pattern = r'### 3\.6\s*`Performer`[^#]*(?=###)'
+        performer_match = re.search(performer_pattern, content, re.DOTALL)
+        if performer_match:
+            performer_section = performer_match.group(0)
+            # 提取ApproachAndSay示例
+            approach_example = re.search(r'npc:ApproachAndSay[^\n]*示例[：:]\s*`([^`]+)`', performer_section)
+            if approach_example:
+                performer_examples.append(f"- `npc:ApproachAndSay`: {approach_example.group(1)}")
+            # 提取PlayAnim示例
+            playanim_example = re.search(r'npc:PlayAnim[^\n]*示例[：:]\s*`([^`]+)`', performer_section)
+            if playanim_example:
+                performer_examples.append(f"- `npc:PlayAnim`: {playanim_example.group(1)}")
+        
+        if performer_examples:
+            examples_parts.append("## Performer接口关键示例")
+            examples_parts.extend(performer_examples)
+            examples_parts.append("")
+        
+        # 提取UI接口的关键示例
+        ui_examples = []
+        ui_pattern = r'### 3\.3\s*`UI`[^#]*(?=###)'
+        ui_match = re.search(ui_pattern, content, re.DOTALL)
+        if ui_match:
+            ui_section = ui_match.group(0)
+            # 提取ShowDialogue示例
+            dialogue_example = re.search(r'UI\.ShowDialogue[^\n]*示例[：:]\s*`([^`]+)`', ui_section)
+            if dialogue_example:
+                ui_examples.append(f"- `UI.ShowDialogue`: {dialogue_example.group(1)}")
+            # 提取AskMany示例
+            askmany_example = re.search(r'UI\.AskMany[^\n]*示例[：:]\s*`([^`]+)`', ui_section)
+            if askmany_example:
+                ui_examples.append(f"- `UI.AskMany`: {askmany_example.group(1)}")
+        
+        if ui_examples:
+            examples_parts.append("## UI接口关键示例")
+            examples_parts.extend(ui_examples)
+            examples_parts.append("")
+        
+        # 提取通用约定
+        convention_match = re.search(r'## 1\.\s*通用约定[^\n]*\n(.*?)(?=\n##)', content, re.DOTALL)
+        if convention_match:
+            examples_parts.append("## 通用约定（来自gameplay_document.md）")
+            examples_parts.append(convention_match.group(1).strip())
+            examples_parts.append("")
+        
+        # 添加完整的Few-Shot示例（基于用户提供的实际代码）
+        examples_parts.append("## 完整Encounter示例（Few-Shot，基于实际项目代码）")
+        examples_parts.append(self._get_few_shot_example())
+        examples_parts.append("")
+        
+        self.reference_examples = "\n".join(examples_parts)
+    
+    def _get_few_shot_example(self) -> str:
+        """
+        返回简化的完整Encounter示例作为Few-Shot示例
+        基于用户提供的实际项目代码格式
+        """
+        return """```lua
+-- 完整Encounter示例（基于实际项目代码格式）
+local function ResolveEncounterLoc()
+    return { X = 12016.593860, Y = 13372.975811, Z = 4797.613441 }
+end
+
+function SpawnEncounter_FirstMeet()
+    local npcData = {
+        enc0_Alice = "Default"
+    }
+
+    local code = [[
+if _G.enc0_done then return end
+_G.enc0_done = true
+
+local player = World.GetByID("Player")
+local alice = World.GetByID("enc0_Alice")
+
+if not player or not player:IsValid() then return end
+if not alice or not alice:IsValid() then return end
+
+if alice and player then
+    alice:ApproachAndSay(player, "稍等片刻，旅行者。")
+    World.Wait(1.0)
+    local choice = UI.Ask("你要怎么做？", "接受", "拒绝")
+    if choice == "接受" then
+        alice:PlayAnimLoop("Happy", 0)
+        World.Wait(1)
+        alice:ApproachAndSay(player, "太好了！让我们开始这段旅程！")
+        alice:SetAsCompanion()
+        UI.Toast("Alice成为同伴")
+    else
+        alice:PlayAnimLoop("Frustrated", 0)
+        World.Wait(1)
+        alice:ApproachAndSay(player, "好吧，我尊重你的选择。")
+    end
+end
+]]
+
+    local loc = ResolveEncounterLoc()
+    return World.SpawnEncounter(loc, 100.0, npcData, "EnterVolume", code)
+end
+
+SpawnEncounter_FirstMeet()
+
+World.StartGame()
+Time.Resume()
+UI.Toast("游戏开始")
+```
+
+**关键格式要求（必须严格遵守）**：
+1. **位置函数**：必须定义 `local function ResolveEncounterLoc()` 返回位置坐标 `{ X = 数值, Y = 数值, Z = 数值 }`
+2. **Encounter函数**：必须使用 `function SpawnEncounter_XXX()` 格式包装
+3. **NPC映射变量**：使用 `local npcData = { enc0_Alice = "Default" }` 格式（键名如 `enc0_Alice`，值为 `"Default"`）
+4. **代码块变量**：使用 `local code = [[ ... ]]` 格式
+5. **代码块内必须包含**：
+   - `if _G.enc0_done then return end` 和 `_G.enc0_done = true`（防止重复触发）
+   - `World.GetByID("Player")` 和 `World.GetByID("enc0_XXX")` 获取对象
+   - `IsValid()` 判空检查（必须检查所有对象）
+   - NPC对话、玩家选择、分支逻辑
+   - `World.Wait()` 控制节奏（每个动作后）
+6. **World.SpawnEncounter调用**：
+   - 第1个参数：`ResolveEncounterLoc()` 返回的位置
+   - 第2个参数：范围数字（如 `100.0` 或 `300.0`）
+   - 第3个参数：`npcData` 变量
+   - 第4个参数：`"EnterVolume"`（字符串）
+   - 第5个参数：`code` 变量
+7. **函数调用**：最后调用 `SpawnEncounter_XXX()`
+8. **初始化代码**：最后包含 `World.StartGame()`, `Time.Resume()`, `UI.Toast("游戏开始")`
+9. **对话格式**：
+   - NPC对话：`npc:ApproachAndSay(player, "文本")` 或 `UI.ShowDialogue("名称", "文本")`
+   - 玩家对话：`UI.ShowDialogue("Player", "文本")`（不能使用player:ApproachAndSay）
+10. **选项格式**：
+    - `UI.Ask("问题", "选项1", "选项2")` 返回字符串
+    - `UI.AskMany("问题", {"选项1", "选项2"})` 返回数字索引（1开始）
+11. **动画格式**：
+    - `npc:PlayAnim("动画名称")` 或 `npc:PlayAnimLoop("动画名称", 0)`（动画名称必须来自素材库）
+    - 停止动画：`npc:PlayAnim("Idle")` 或 `npc:PlayAnimLoop("Idle", 0)`
+12. **代码块内不能有注释（`--`），否则引擎报错**
+13. **所有对话内容不要使用方括号（正确：`"文本"`，错误：`"[文本]"`）**"""
+    
+    def get_reference_examples(self) -> str:
+        """获取参考文档中的示例代码"""
+        return self.reference_examples
     
     def _parse_markdown(self, content: str):
         """解析Markdown格式的知识库"""
@@ -556,6 +766,41 @@ class GameplayKnowledgeBase:
 """
             if func.common_errors:
                 docs_text += f"常见错误: {func.common_errors}\n"
+        
+        # 如果涉及Performer模块（包含PlayAnim），添加动画素材库信息
+        has_performer = any(func.module == "Performer" for func in functions)
+        has_playanim = any("PlayAnim" in func.function_name for func in functions)
+        
+        if has_performer or has_playanim:
+            docs_text += "\n## 动画素材库（Animation Library）\n"
+            docs_text += "**重要：PlayAnim必须使用以下动画名称，禁止使用素材库之外的动画名称**\n\n"
+            docs_text += "### 基础动作\n"
+            docs_text += "- Idle（待机）, Walk（行走）, Run（奔跑）\n\n"
+            docs_text += "### 跳跃动作\n"
+            docs_text += "- Jump_01（起跳_01）, Jump_02（凌空_02）, Jump_03（落地_03）\n\n"
+            docs_text += "### 战斗动作\n"
+            docs_text += "- Melee Attack_01/02/03（近战普攻）, Ranged Attack_01/02/03（远程普攻）\n\n"
+            docs_text += "### 情绪动作\n"
+            docs_text += "- Happy（开心）, Admiring（崇拜）, Shy（害羞）, Frustrated（沮丧）, Scared（恐惧）\n\n"
+            docs_text += "### 交互动作\n"
+            docs_text += "- Pick Up（拾取）, Hide（躲藏）, Eat（吃）, Drink（喝）, Sleep（睡）\n"
+            docs_text += "- Sit（坐在椅子上）, Dialogue（说话）, Give（给予）, Point To（指向目标）\n"
+            docs_text += "- Wave（挥手打招呼）, Sing（唱歌）, Dance（跳舞）\n\n"
+            docs_text += "**常用动画推荐**：Wave（挥手）、Happy（开心）、Shy（害羞）、Scared（恐惧）、Drink（喝）、Sleep（睡）、Dialogue（说话）\n"
+        
+        # 如果涉及UI模块，添加玩家对话规则
+        has_ui = any(func.module == "UI" for func in functions)
+        has_dialogue = any("ShowDialogue" in func.function_name or "ApproachAndSay" in func.function_name for func in functions)
+        
+        if has_ui or has_dialogue:
+            docs_text += "\n## 对话规则（Dialogue Rules）\n"
+            docs_text += "**重要：玩家对话必须使用UI.ShowDialogue，不能使用ApproachAndSay**\n\n"
+            docs_text += "- NPC说话：使用 `npc:ApproachAndSay(player, \"文本\")` 或 `UI.ShowDialogue(\"NPC名称\", \"文本\")`\n"
+            docs_text += "- 玩家说话：**必须使用** `UI.ShowDialogue(\"Player\", \"文本\")` 或 `UI.ShowDialogue(\"角色名\", \"文本\")`\n"
+            docs_text += "- **禁止**使用 `player:ApproachAndSay()`，玩家没有ApproachAndSay方法\n"
+            docs_text += "- **对话内容格式**：所有对话内容直接使用引号包裹，**不要使用方括号**\n"
+            docs_text += "  - 正确示例：`npcA:ApproachAndSay(player, \"你好\")`\n"
+            docs_text += "  - 错误示例：`npcA:ApproachAndSay(player, \"[你好]\")`\n"
         
         return docs_text
 

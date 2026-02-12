@@ -254,27 +254,32 @@ UI.FadeIn(0.5)
 B4. 显示对白（ShowDialogue）
 
 UI.ShowDialogue(name, text) -> nil|any（异步）
-说明：显示 UI 对话框。
+说明：显示 UI 对话框。**重要：玩家说话必须使用此函数，不能使用ApproachAndSay**。
 参数：
 
-name：string
+name：string（说话者名称，玩家说话时使用"Player"或角色名）
 
-text：string
+text：string（对话内容，直接使用引号包裹，不要使用方括号）
 
 示例：
 
 UI.ShowDialogue("商人", "你看起来不像本地人。")
+UI.ShowDialogue("Player", "是的，我来自远方。")  // 玩家说话
 
 
 推荐用法：
 
 UI.ShowDialogue("旅人", "等等！你能帮我一下吗？")
 World.Wait(0.6)
+UI.ShowDialogue("Player", "当然可以，需要什么帮助？")  // 玩家说话
+World.Wait(0.6)
 
 
 常见错误：
 
 连续多句对白无 Wait
+玩家说话使用了ApproachAndSay（错误！玩家必须用UI.ShowDialogue）
+对话内容使用了方括号（错误：`"[文本]"`，正确：`"文本"`）
 
 B5. 二选一选择（Ask）
 
@@ -532,20 +537,35 @@ npcA:LookAt(player)
 E6. PlayAnim（播放动画）
 
 npc:PlayAnim(animName) -> nil（异步）
-说明：播放一次动画。
+说明：播放一次动画。**重要：animName必须来自动画素材库，不能随意创建动画名称**。
 参数：
 
-animName：string
+animName：string（必须使用动画素材库中的名称，如"Wave"、"Happy"、"Drink"等）
+
+可用动画列表：
+- 基础：Idle, Walk, Run
+- 跳跃：Jump_01, Jump_02, Jump_03
+- 战斗：Melee Attack_01/02/03, Ranged Attack_01/02/03
+- 情绪：Happy, Admiring, Shy, Frustrated, Scared
+- 交互：Pick Up, Hide, Eat, Drink, Sleep, Sit, Dialogue, Give, Point To, Wave, Sing, Dance
 
 示例：
 
 npcA:PlayAnim("Wave")
+npcA:PlayAnim("Happy")
+npcA:PlayAnim("Drink")
 
 
 推荐用法：
 
 npcA:PlayAnim("Wave")
 World.Wait(0.6)
+
+
+常见错误：
+
+使用不存在的动画名称（如"Alice_Wave"、"Angry"等）
+动画名称不在素材库中
 
 E7. PlayAnimLoop（循环动画）
 
@@ -569,7 +589,7 @@ npc:ApproachAndSay(target, text) -> nil（异步）
 
 target：Actor
 
-text：string
+text：string（对话内容，直接使用引号包裹，不要使用方括号）
 
 示例：
 
@@ -580,6 +600,11 @@ npcA:ApproachAndSay(player, "等等！你能帮我一下吗？")
 
 npcA:ApproachAndSay(player, "你看起来不像本地人。")
 World.Wait(1.0)
+
+
+常见错误：
+
+对话内容使用了方括号（错误：`"[文本]"`，正确：`"文本"`）
 
 E9. SetAsHostile（敌对化）
 
